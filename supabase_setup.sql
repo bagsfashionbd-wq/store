@@ -1,12 +1,13 @@
--- ==========================================
--- AQUASTORE / WHITE-LABEL E-COMMERCE DATABASE SETUP
--- Single Clean Setup SQL for New Store Deployments
--- ==========================================
+-- ==============================================================================
+-- COMPLETE MASTER DATABASE SETUP FOR NEW STORE DEPLOYMENTS
+-- Single Clean Setup SQL (No Demo Products - Clean Slate Production Ready)
+-- ==============================================================================
 
 -- 1. ENABLE EXTENSIONS
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 2. CREATE CATEGORIES TABLE (Hierarchical with parent_id)
+-- 2. CREATE CATEGORIES TABLE (Hierarchical with 3-tier parent_id support)
 CREATE TABLE IF NOT EXISTS public.categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     parent_id UUID REFERENCES public.categories(id) ON DELETE SET NULL,
@@ -17,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.categories (
 );
 CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON public.categories(parent_id);
 
--- 3. CREATE PRODUCTS TABLE
+-- 3. CREATE PRODUCTS TABLE (With buying_price / cost tracking)
 CREATE TABLE IF NOT EXISTS public.products (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     category_id UUID REFERENCES public.categories(id) ON DELETE SET NULL,
@@ -26,7 +27,7 @@ CREATE TABLE IF NOT EXISTS public.products (
     description TEXT,
     price NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
     old_price NUMERIC(10, 2) DEFAULT 0.00,
-    buying_price NUMERIC(10, 2) DEFAULT 0.00,
+    buying_price NUMERIC(10, 2) DEFAULT 0.00, -- Internal wholesale cost (hidden from customers)
     stock INT NOT NULL DEFAULT 0,
     images TEXT[] DEFAULT '{}',
     variations JSONB DEFAULT '{"options": []}'::JSONB,
@@ -36,6 +37,8 @@ CREATE TABLE IF NOT EXISTS public.products (
     is_hidden BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_products_category_id ON public.products(category_id);
+CREATE INDEX IF NOT EXISTS idx_products_slug ON public.products(slug);
 
 -- 4. CREATE ORDERS TABLE
 CREATE TABLE IF NOT EXISTS public.orders (
@@ -44,7 +47,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
     customer_phone VARCHAR(50) NOT NULL,
     customer_email VARCHAR(255),
     shipping_address TEXT NOT NULL,
-    shipping_provider VARCHAR(50) DEFAULT 'pathao', -- 'pathao' or 'steadfast'
+    shipping_provider VARCHAR(50) DEFAULT 'pathao', -- 'pathao', 'steadfast', or 'manual'
     city_id INT DEFAULT 0,
     zone_id INT DEFAULT 0,
     area_id INT DEFAULT 0,
@@ -60,6 +63,8 @@ CREATE TABLE IF NOT EXISTS public.orders (
     steadfast_tracking_code VARCHAR(255),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON public.orders(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_customer_phone ON public.orders(customer_phone);
 
 -- 5. CREATE ORDER ITEMS TABLE
 CREATE TABLE IF NOT EXISTS public.order_items (
@@ -71,8 +76,9 @@ CREATE TABLE IF NOT EXISTS public.order_items (
     selected_variations JSONB DEFAULT '{}'::JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON public.order_items(order_id);
 
--- 6. CREATE CONTACT MESSAGES TABLE
+-- 6. CREATE CONTACT INQUIRY MESSAGES TABLE
 CREATE TABLE IF NOT EXISTS public.contact_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
@@ -113,7 +119,7 @@ CREATE TABLE IF NOT EXISTS public.store_settings (
     -- Courier Selection & Credentials
     pathao_enabled BOOLEAN DEFAULT TRUE,
     steadfast_enabled BOOLEAN DEFAULT TRUE,
-    active_shipping_provider VARCHAR(50) DEFAULT 'pathao', -- 'pathao' or 'steadfast'
+    active_shipping_provider VARCHAR(50) DEFAULT 'pathao',
     pathao_api_url TEXT DEFAULT 'https://courier-api-sandbox.pathao.com',
     pathao_client_id TEXT DEFAULT '',
     pathao_client_secret TEXT DEFAULT '',
@@ -128,10 +134,10 @@ CREATE TABLE IF NOT EXISTS public.store_settings (
     delivery_charge_outside_dhaka NUMERIC(10, 2) NOT NULL DEFAULT 120.00,
     -- About & Contact Info
     about_enabled BOOLEAN DEFAULT TRUE,
-    about_story TEXT DEFAULT '',
-    contact_phone VARCHAR(50) DEFAULT '',
-    contact_email VARCHAR(255) DEFAULT '',
-    contact_address TEXT DEFAULT '',
+    about_story TEXT DEFAULT 'Welcome to our store! We provide high-quality items curated with passion and attention to detail. Every product is backed by nationwide delivery and friendly support.',
+    contact_phone VARCHAR(50) DEFAULT '+880 1700-000000',
+    contact_email VARCHAR(255) DEFAULT 'support@store.com',
+    contact_address TEXT DEFAULT 'Dhaka, Bangladesh',
     google_map_embed_url TEXT DEFAULT '',
     -- Special Collections (Featured, Best Seller, Trending)
     show_featured BOOLEAN DEFAULT TRUE,
@@ -142,7 +148,7 @@ CREATE TABLE IF NOT EXISTS public.store_settings (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Seed initial settings row if none exists
+-- Seed Initial Default Store Settings Row
 INSERT INTO public.store_settings (
     id, store_name, store_tagline, hero_title, hero_subtitle, hero_badge_text,
     hero_description, theme_color, active_shipping_provider,
@@ -150,12 +156,12 @@ INSERT INTO public.store_settings (
     about_enabled, about_story, contact_phone, contact_email, contact_address
 ) VALUES (
     '00000000-0000-0000-0000-000000000001',
-    'Verdant Aquatics',
-    'Premium Aquariums, Accessories & Aquatic Plants in Bangladesh',
-    'Create Your Own',
-    'Underwater Paradise',
-    'Premium Aquascaping Shop',
-    'Explore our curated selection of high-clarity rimless aquariums, smart filtration systems, full-spectrum lights, and natural plants. Get delivery all over Bangladesh via Courier and pay securely with bKash.',
+    'My Store',
+    'Premium Quality Products in Bangladesh',
+    'Discover Our',
+    'Exclusive Collection',
+    'Featured Store',
+    'Browse our curated collection with fast door-to-door delivery across Bangladesh and secure checkout.',
     'emerald',
     'pathao',
     60.00,
@@ -163,45 +169,11 @@ INSERT INTO public.store_settings (
     true,
     'Welcome to our store! We provide high-quality items curated with passion and attention to detail. Every product is backed by nationwide delivery and friendly support.',
     '+880 1700-000000',
-    'support@store.com',
+    'sakib.samadhan@gmail.com',
     'Dhaka, Bangladesh'
 ) ON CONFLICT (id) DO NOTHING;
 
--- 8. SET UP ROW LEVEL SECURITY (RLS) POLICIES
-ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.contact_messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.store_settings ENABLE ROW LEVEL SECURITY;
-
--- Categories
-CREATE POLICY "Allow public read categories" ON public.categories FOR SELECT USING (true);
-CREATE POLICY "Allow admin write categories" ON public.categories FOR ALL TO authenticated USING (true);
-
--- Products
-CREATE POLICY "Allow public read products" ON public.products FOR SELECT USING (true);
-CREATE POLICY "Allow admin write products" ON public.products FOR ALL TO authenticated USING (true);
-
--- Orders
-CREATE POLICY "Allow public insert orders" ON public.orders FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow users and admin read orders" ON public.orders FOR SELECT USING (true);
-CREATE POLICY "Allow admin manage orders" ON public.orders FOR ALL TO authenticated USING (true);
-
--- Order Items
-CREATE POLICY "Allow public insert order items" ON public.order_items FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public read order items" ON public.order_items FOR SELECT USING (true);
-CREATE POLICY "Allow admin manage order items" ON public.order_items FOR ALL TO authenticated USING (true);
-
--- Contact Messages
-CREATE POLICY "Allow public insert contact messages" ON public.contact_messages FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow admin manage contact messages" ON public.contact_messages FOR ALL TO authenticated USING (true);
-
--- Store Settings
-CREATE POLICY "Allow public read settings" ON public.store_settings FOR SELECT USING (true);
-CREATE POLICY "Allow admin manage settings" ON public.store_settings FOR ALL TO authenticated USING (true);
-
--- 9. CREATE STAFF MEMBERS & RBAC TABLE
+-- 8. CREATE STAFF MEMBERS & ROLE-BASED ACCESS CONTROL (RBAC)
 CREATE TABLE IF NOT EXISTS public.staff_members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -217,18 +189,140 @@ CREATE INDEX IF NOT EXISTS idx_staff_members_email ON public.staff_members(email
 CREATE INDEX IF NOT EXISTS idx_staff_members_user_id ON public.staff_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_staff_members_role ON public.staff_members(role);
 
+-- 9. CREATE AUTH ADMIN USER & STAFF RECORD (sakib.samadhan@gmail.com / Sakib@9700)
+DO $$
+DECLARE
+    new_user_id UUID := gen_random_uuid();
+BEGIN
+    -- Check if user already exists in auth.users
+    IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'sakib.samadhan@gmail.com') THEN
+        INSERT INTO auth.users (
+            instance_id,
+            id,
+            aud,
+            role,
+            email,
+            encrypted_password,
+            email_confirmed_at,
+            recovery_sent_at,
+            last_sign_in_at,
+            raw_app_meta_data,
+            raw_user_meta_data,
+            created_at,
+            updated_at,
+            confirmation_token,
+            email_change,
+            email_change_token_new,
+            recovery_token
+        ) VALUES (
+            '00000000-0000-0000-0000-000000000000',
+            new_user_id,
+            'authenticated',
+            'authenticated',
+            'sakib.samadhan@gmail.com',
+            crypt('Sakib@9700', gen_salt('bf')),
+            NOW(),
+            NOW(),
+            NOW(),
+            '{"provider":"email","providers":["email"]}'::jsonb,
+            '{"full_name":"Sakib Samadhan"}'::jsonb,
+            NOW(),
+            NOW(),
+            '',
+            '',
+            '',
+            ''
+        );
+
+        -- Insert identity record (REQUIRED by Supabase GoTrue Auth)
+        INSERT INTO auth.identities (
+            id,
+            user_id,
+            identity_data,
+            provider,
+            provider_id,
+            last_sign_in_at,
+            created_at,
+            updated_at
+        ) VALUES (
+            new_user_id,
+            new_user_id,
+            format('{"sub":"%s","email":"%s"}', new_user_id, 'sakib.samadhan@gmail.com')::jsonb,
+            'email',
+            new_user_id::text,
+            NOW(),
+            NOW(),
+            NOW()
+        );
+    ELSE
+        -- Update password if user already exists
+        UPDATE auth.users
+        SET encrypted_password = crypt('Sakib@9700', gen_salt('bf')),
+            email_confirmed_at = COALESCE(email_confirmed_at, NOW()),
+            updated_at = NOW()
+        WHERE email = 'sakib.samadhan@gmail.com';
+    END IF;
+
+    -- Upsert in staff_members table
+    INSERT INTO public.staff_members (
+        user_id,
+        email,
+        full_name,
+        role,
+        status
+    )
+    SELECT
+        id,
+        'sakib.samadhan@gmail.com',
+        'Sakib Samadhan',
+        'shop_owner',
+        'active'
+    FROM auth.users
+    WHERE email = 'sakib.samadhan@gmail.com'
+    ON CONFLICT (email) DO UPDATE
+    SET role = 'shop_owner', status = 'active';
+END $$;
+
+-- 10. ENABLE ROW LEVEL SECURITY (RLS) POLICIES
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.contact_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.store_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.staff_members ENABLE ROW LEVEL SECURITY;
+
+-- Categories RLS
+CREATE POLICY "Allow public read categories" ON public.categories FOR SELECT USING (true);
+CREATE POLICY "Allow admin write categories" ON public.categories FOR ALL TO authenticated USING (true);
+
+-- Products RLS
+CREATE POLICY "Allow public read products" ON public.products FOR SELECT USING (true);
+CREATE POLICY "Allow admin write products" ON public.products FOR ALL TO authenticated USING (true);
+
+-- Orders RLS
+CREATE POLICY "Allow public insert orders" ON public.orders FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow users and admin read orders" ON public.orders FOR SELECT USING (true);
+CREATE POLICY "Allow admin manage orders" ON public.orders FOR ALL TO authenticated USING (true);
+
+-- Order Items RLS
+CREATE POLICY "Allow public insert order items" ON public.order_items FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public read order items" ON public.order_items FOR SELECT USING (true);
+CREATE POLICY "Allow admin manage order items" ON public.order_items FOR ALL TO authenticated USING (true);
+
+-- Contact Messages RLS
+CREATE POLICY "Allow public insert contact messages" ON public.contact_messages FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow admin manage contact messages" ON public.contact_messages FOR ALL TO authenticated USING (true);
+
+-- Store Settings RLS
+CREATE POLICY "Allow public read settings" ON public.store_settings FOR SELECT USING (true);
+CREATE POLICY "Allow admin manage settings" ON public.store_settings FOR ALL TO authenticated USING (true);
+
+-- Staff Members RLS
 CREATE POLICY "Allow authenticated read staff" ON public.staff_members FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Allow admin manage staff" ON public.staff_members FOR ALL TO authenticated USING (true);
 
--- Seed initial staff founder/admin
-INSERT INTO public.staff_members (email, full_name, role, status)
-VALUES 
-    ('sakib.samadhan@gmail.com', 'Store Founder', 'shop_owner', 'active'),
-    ('admin@example.com', 'System Administrator', 'admin', 'active')
-ON CONFLICT (email) DO NOTHING;
-
--- 10. RPC FUNCTION TO SAFELY DECREMENT STOCK
+-- 11. RPC FUNCTION TO SAFELY DECREMENT PRODUCT STOCK
 CREATE OR REPLACE FUNCTION decrement_product_stock(prod_id UUID, qty INT)
 RETURNS VOID AS $$
 BEGIN
