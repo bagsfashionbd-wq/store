@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { getStoreSettings, invalidateSettingsCache, DEFAULT_SETTINGS, StoreSettings } from '@/utils/settings'
+import { formatExternalUrl } from '@/utils/url'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,9 +63,16 @@ export async function PUT(request: NextRequest) {
       about_enabled: body.about_enabled !== undefined ? Boolean(body.about_enabled) : current.about_enabled,
       about_story: body.about_story !== undefined ? body.about_story : current.about_story,
       contact_phone: body.contact_phone !== undefined ? body.contact_phone : current.contact_phone,
+      contact_whatsapp: body.contact_whatsapp !== undefined ? body.contact_whatsapp : current.contact_whatsapp,
       contact_email: body.contact_email !== undefined ? body.contact_email : current.contact_email,
       contact_address: body.contact_address !== undefined ? body.contact_address : current.contact_address,
       google_map_embed_url: body.google_map_embed_url !== undefined ? body.google_map_embed_url : current.google_map_embed_url,
+      social_facebook: body.social_facebook !== undefined ? formatExternalUrl(body.social_facebook) : current.social_facebook,
+      social_instagram: body.social_instagram !== undefined ? formatExternalUrl(body.social_instagram) : current.social_instagram,
+      social_youtube: body.social_youtube !== undefined ? formatExternalUrl(body.social_youtube) : current.social_youtube,
+      social_tiktok: body.social_tiktok !== undefined ? formatExternalUrl(body.social_tiktok) : current.social_tiktok,
+      social_twitter: body.social_twitter !== undefined ? formatExternalUrl(body.social_twitter) : current.social_twitter,
+      social_linkedin: body.social_linkedin !== undefined ? formatExternalUrl(body.social_linkedin) : current.social_linkedin,
       show_featured: body.show_featured !== undefined ? Boolean(body.show_featured) : current.show_featured,
       show_best_seller: body.show_best_seller !== undefined ? Boolean(body.show_best_seller) : current.show_best_seller,
       show_trending: body.show_trending !== undefined ? Boolean(body.show_trending) : current.show_trending,

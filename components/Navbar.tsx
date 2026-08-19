@@ -166,12 +166,12 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                 </Link>
               )}
 
-              {settings.about_enabled && (settings.about_story || settings.contact_address || settings.contact_phone || settings.contact_email) && (
+              {settings.about_enabled && (settings.about_story || settings.contact_address || settings.contact_phone || settings.contact_whatsapp || settings.contact_email) && (
                 <Link
                   href="/about"
                   className="text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-brand-600 px-3 py-2 rounded-md hover:bg-slate-50 transition-colors"
                 >
-                  About
+                  About Us
                 </Link>
               )}
             </nav>
@@ -348,7 +348,7 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
               )}
 
               <div className="pt-2 border-t border-slate-100 space-y-1">
-                {settings.about_enabled && (settings.about_story || settings.contact_address || settings.contact_phone || settings.contact_email) && (
+                {settings.about_enabled && (settings.about_story || settings.contact_address || settings.contact_phone || settings.contact_whatsapp || settings.contact_email) && (
                   <Link
                     href="/about"
                     onClick={() => setMobileMenuOpen(false)}

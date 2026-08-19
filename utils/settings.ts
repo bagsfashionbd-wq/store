@@ -45,9 +45,17 @@ export interface StoreSettings {
   about_enabled: boolean
   about_story: string
   contact_phone: string
+  contact_whatsapp: string
   contact_email: string
   contact_address: string
   google_map_embed_url: string
+  // Social Media Channels
+  social_facebook: string
+  social_instagram: string
+  social_youtube: string
+  social_tiktok: string
+  social_twitter: string
+  social_linkedin: string
   // Special Collections
   show_featured: boolean
   show_best_seller: boolean
@@ -79,9 +87,16 @@ export interface PublicStoreSettings {
   about_enabled: boolean
   about_story: string
   contact_phone: string
+  contact_whatsapp: string
   contact_email: string
   contact_address: string
   google_map_embed_url: string
+  social_facebook: string
+  social_instagram: string
+  social_youtube: string
+  social_tiktok: string
+  social_twitter: string
+  social_linkedin: string
   show_featured: boolean
   show_best_seller: boolean
   show_trending: boolean
@@ -125,9 +140,16 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   about_enabled: true,
   about_story: '',
   contact_phone: '',
+  contact_whatsapp: '',
   contact_email: '',
   contact_address: '',
   google_map_embed_url: '',
+  social_facebook: '',
+  social_instagram: '',
+  social_youtube: '',
+  social_tiktok: '',
+  social_twitter: '',
+  social_linkedin: '',
   show_featured: true,
   show_best_seller: true,
   show_trending: true,
@@ -171,9 +193,16 @@ export async function getStoreSettings(forceFresh = false): Promise<StoreSetting
       about_enabled: data.about_enabled !== undefined ? Boolean(data.about_enabled) : DEFAULT_SETTINGS.about_enabled,
       about_story: data.about_story ?? '',
       contact_phone: data.contact_phone ?? '',
+      contact_whatsapp: data.contact_whatsapp ?? '',
       contact_email: data.contact_email ?? '',
       contact_address: data.contact_address ?? '',
       google_map_embed_url: data.google_map_embed_url ?? '',
+      social_facebook: data.social_facebook ?? '',
+      social_instagram: data.social_instagram ?? '',
+      social_youtube: data.social_youtube ?? '',
+      social_tiktok: data.social_tiktok ?? '',
+      social_twitter: data.social_twitter ?? '',
+      social_linkedin: data.social_linkedin ?? '',
       show_featured: data.show_featured !== undefined ? Boolean(data.show_featured) : DEFAULT_SETTINGS.show_featured,
       show_best_seller: data.show_best_seller !== undefined ? Boolean(data.show_best_seller) : DEFAULT_SETTINGS.show_best_seller,
       show_trending: data.show_trending !== undefined ? Boolean(data.show_trending) : DEFAULT_SETTINGS.show_trending,
@@ -213,9 +242,16 @@ export async function getPublicSettings(): Promise<PublicStoreSettings> {
     about_enabled: full.about_enabled,
     about_story: full.about_story,
     contact_phone: full.contact_phone,
+    contact_whatsapp: full.contact_whatsapp,
     contact_email: full.contact_email,
     contact_address: full.contact_address,
     google_map_embed_url: full.google_map_embed_url,
+    social_facebook: full.social_facebook,
+    social_instagram: full.social_instagram,
+    social_youtube: full.social_youtube,
+    social_tiktok: full.social_tiktok,
+    social_twitter: full.social_twitter,
+    social_linkedin: full.social_linkedin,
     show_featured: full.show_featured,
     show_best_seller: full.show_best_seller,
     show_trending: full.show_trending,
@@ -229,4 +265,5 @@ export function invalidateSettingsCache() {
   cacheTimestamp = 0
 }
 
+export { formatExternalUrl } from '@/utils/url'
 export { type ThemePalette, THEME_PALETTES } from '@/utils/theme'

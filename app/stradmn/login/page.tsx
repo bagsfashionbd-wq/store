@@ -6,6 +6,8 @@ import { createClient } from '@/utils/supabase/client'
 import { useStore } from '@/context/StoreContext'
 import { ShieldCheck, Loader2 } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+
 function AdminLoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()

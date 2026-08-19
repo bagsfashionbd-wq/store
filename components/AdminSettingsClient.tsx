@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { StoreSettings } from '@/utils/settings'
+import { formatExternalUrl } from '@/utils/url'
 import { THEME_PALETTES } from '@/utils/theme'
 import { formatGoogleMapsEmbedUrl } from '@/utils/map'
 import ImageUploader from '@/components/ImageUploader'
@@ -12,7 +13,8 @@ import AdminSidebar from '@/components/AdminSidebar'
 import { 
   BarChart3, ShoppingBag, Package, LogOut, Settings, Save, 
   Check, AlertCircle, RefreshCw, Upload, Sparkles, Truck, 
-  CreditCard, Palette, Layout, ExternalLink, Layers, Info, MapPin, Phone, Mail, MessageSquare, Eye
+  CreditCard, Palette, Layout, ExternalLink, Layers, Info, MapPin, Phone, Mail, MessageSquare, Eye,
+  Share2, MessageCircle, Globe
 } from 'lucide-react'
 import axios from 'axios'
 
@@ -1197,11 +1199,11 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                   </div>
                 )}
 
-                {/* Contact Phone & Email */}
+                {/* Contact Phone & WhatsApp (Separated) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1.5">
-                      <Phone className="h-3.5 w-3.5 text-brand-600" /> Contact Phone / WhatsApp
+                      <Phone className="h-3.5 w-3.5 text-brand-600" /> Contact Phone (Voice Calls)
                     </label>
                     <input
                       type="text"
@@ -1210,23 +1212,164 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                       placeholder="e.g. +880 1700-000000"
                       className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
                     />
+                    <p className="text-[10px] text-slate-400 mt-1">Displayed for regular phone calls and SMS</p>
                   </div>
+
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1.5">
-                      <Mail className="h-3.5 w-3.5 text-brand-600" /> Support Email
+                      <MessageCircle className="h-3.5 w-3.5 text-emerald-600" /> WhatsApp Number (Chat)
                     </label>
                     <input
-                      type="email"
-                      value={settings.contact_email || ''}
-                      onChange={(e) => setSettings({ ...settings, contact_email: e.target.value })}
-                      placeholder="e.g. contact@store.com"
+                      type="text"
+                      value={settings.contact_whatsapp || ''}
+                      onChange={(e) => setSettings({ ...settings, contact_whatsapp: e.target.value })}
+                      placeholder="e.g. +880 1700-000000 or 017XXXXXXXX"
                       className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
                     />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Enables 1-click WhatsApp messaging for customers across the store
+                    </p>
+                  </div>
+                </div>
+
+                {/* Email Support */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1.5">
+                    <Mail className="h-3.5 w-3.5 text-brand-600" /> Support Email
+                  </label>
+                  <input
+                    type="email"
+                    value={settings.contact_email || ''}
+                    onChange={(e) => setSettings({ ...settings, contact_email: e.target.value })}
+                    placeholder="e.g. contact@store.com"
+                    className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
+                  />
+                </div>
+
+                {/* Social Media & Online Channels Section */}
+                <div className="pt-4 border-t border-slate-200 space-y-4">
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-900 uppercase flex items-center gap-2">
+                      <Share2 className="h-4 w-4 text-brand-600" /> Social Media & Online Channels
+                    </h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Add your store's social media page URLs. Active channels will automatically render with custom icons in the footer and about/contact pages.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Facebook */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1.5">
+                        <span className="text-[#1877F2] font-black text-sm">f</span> Facebook Page / Group URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_facebook || ''}
+                        onChange={(e) => setSettings({ ...settings, social_facebook: e.target.value })}
+                        onBlur={(e) => {
+                          const formatted = formatExternalUrl(e.target.value)
+                          setSettings({ ...settings, social_facebook: formatted })
+                        }}
+                        placeholder="https://facebook.com/yourpage"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
+                      />
+                    </div>
+
+                    {/* Instagram */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1.5">
+                        <span className="text-[#E4405F] font-black text-sm">📸</span> Instagram Profile URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_instagram || ''}
+                        onChange={(e) => setSettings({ ...settings, social_instagram: e.target.value })}
+                        onBlur={(e) => {
+                          const formatted = formatExternalUrl(e.target.value)
+                          setSettings({ ...settings, social_instagram: formatted })
+                        }}
+                        placeholder="https://instagram.com/yourprofile"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
+                      />
+                    </div>
+
+                    {/* YouTube */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1.5">
+                        <span className="text-[#FF0000] font-black text-sm">▶</span> YouTube Channel URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_youtube || ''}
+                        onChange={(e) => setSettings({ ...settings, social_youtube: e.target.value })}
+                        onBlur={(e) => {
+                          const formatted = formatExternalUrl(e.target.value)
+                          setSettings({ ...settings, social_youtube: formatted })
+                        }}
+                        placeholder="https://youtube.com/@yourchannel"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
+                      />
+                    </div>
+
+                    {/* TikTok */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1.5">
+                        <span className="text-slate-900 font-black text-sm">🎵</span> TikTok Profile URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_tiktok || ''}
+                        onChange={(e) => setSettings({ ...settings, social_tiktok: e.target.value })}
+                        onBlur={(e) => {
+                          const formatted = formatExternalUrl(e.target.value)
+                          setSettings({ ...settings, social_tiktok: formatted })
+                        }}
+                        placeholder="https://tiktok.com/@yourprofile"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
+                      />
+                    </div>
+
+                    {/* Twitter / X */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1.5">
+                        <span className="text-slate-900 font-black text-sm">𝕏</span> X (Twitter) Profile URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_twitter || ''}
+                        onChange={(e) => setSettings({ ...settings, social_twitter: e.target.value })}
+                        onBlur={(e) => {
+                          const formatted = formatExternalUrl(e.target.value)
+                          setSettings({ ...settings, social_twitter: formatted })
+                        }}
+                        placeholder="https://x.com/yourhandle"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
+                      />
+                    </div>
+
+                    {/* LinkedIn */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1.5">
+                        <span className="text-[#0A66C2] font-black text-sm">in</span> LinkedIn Page URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_linkedin || ''}
+                        onChange={(e) => setSettings({ ...settings, social_linkedin: e.target.value })}
+                        onBlur={(e) => {
+                          const formatted = formatExternalUrl(e.target.value)
+                          setSettings({ ...settings, social_linkedin: formatted })
+                        }}
+                        placeholder="https://linkedin.com/company/yourcompany"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
+                      />
+                    </div>
                   </div>
                 </div>
 
                 {/* Physical Address */}
-                <div>
+                <div className="pt-4 border-t border-slate-200">
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1.5">
                     <MapPin className="h-3.5 w-3.5 text-brand-600" /> Store Physical Location / Address
                   </label>

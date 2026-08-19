@@ -136,9 +136,17 @@ CREATE TABLE IF NOT EXISTS public.store_settings (
     about_enabled BOOLEAN DEFAULT TRUE,
     about_story TEXT DEFAULT 'Welcome to our store! We provide high-quality items curated with passion and attention to detail. Every product is backed by nationwide delivery and friendly support.',
     contact_phone VARCHAR(50) DEFAULT '+880 1700-000000',
+    contact_whatsapp VARCHAR(50) DEFAULT '',
     contact_email VARCHAR(255) DEFAULT 'support@store.com',
     contact_address TEXT DEFAULT 'Dhaka, Bangladesh',
     google_map_embed_url TEXT DEFAULT '',
+    -- Social Media Links
+    social_facebook TEXT DEFAULT '',
+    social_instagram TEXT DEFAULT '',
+    social_youtube TEXT DEFAULT '',
+    social_tiktok TEXT DEFAULT '',
+    social_twitter TEXT DEFAULT '',
+    social_linkedin TEXT DEFAULT '',
     -- Special Collections (Featured, Best Seller, Trending)
     show_featured BOOLEAN DEFAULT TRUE,
     show_best_seller BOOLEAN DEFAULT TRUE,
@@ -153,7 +161,7 @@ INSERT INTO public.store_settings (
     id, store_name, store_tagline, hero_title, hero_subtitle, hero_badge_text,
     hero_description, theme_color, active_shipping_provider,
     delivery_charge_inside_dhaka, delivery_charge_outside_dhaka,
-    about_enabled, about_story, contact_phone, contact_email, contact_address
+    about_enabled, about_story, contact_phone, contact_whatsapp, contact_email, contact_address
 ) VALUES (
     '00000000-0000-0000-0000-000000000001',
     'My Store',
@@ -169,6 +177,7 @@ INSERT INTO public.store_settings (
     true,
     'Welcome to our store! We provide high-quality items curated with passion and attention to detail. Every product is backed by nationwide delivery and friendly support.',
     '+880 1700-000000',
+    '',
     'sakib.samadhan@gmail.com',
     'Dhaka, Bangladesh'
 ) ON CONFLICT (id) DO NOTHING;
