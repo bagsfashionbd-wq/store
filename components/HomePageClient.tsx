@@ -10,6 +10,7 @@ import CartDrawer from '@/components/CartDrawer'
 import ProductCard from '@/components/ProductCard'
 import ShowcaseSection from '@/components/ShowcaseSection'
 import { useStore } from '@/context/StoreContext'
+import { useLanguage } from '@/context/LanguageContext'
 
 interface Product {
   id: string
@@ -45,6 +46,7 @@ interface HomePageClientProps {
 export default function HomePageClient({ products, categories, allTimeSales = {}, last30DaysSales = {} }: HomePageClientProps) {
   const router = useRouter()
   const { settings } = useStore()
+  const { t, toBengaliDigits, isBangla } = useLanguage()
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [cartDrawerOpen, setCartDrawerOpen] = useState<boolean>(false)
@@ -164,7 +166,7 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
                 href="#catalog"
                 className="rounded-lg bg-brand-600 px-6 py-3 text-sm font-bold text-white shadow-lg hover:bg-brand-500 transition-all"
               >
-                Browse Shop
+                {t('hero.shop_now')}
               </Link>
             </div>
           </div>
@@ -174,9 +176,9 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
       {/* SHOWCASE SECTION 1: FEATURED */}
       {settings.show_featured && featuredProducts.length > 0 && (
         <ShowcaseSection
-          title="Featured Collection"
-          subtitle="Hand-Picked Selections"
-          badgeText="Hand-Picked Selections"
+          title={isBangla ? 'ফিচার্ড কালেকশন' : 'Featured Collection'}
+          subtitle={isBangla ? 'সেরা বাছাইকৃত পণ্য' : 'Hand-Picked Selections'}
+          badgeText={isBangla ? 'সেরা বাছাইকৃত' : 'Hand-Picked Selections'}
           type="featured"
           viewAllHref="/featured"
           products={featuredProducts}
@@ -188,9 +190,9 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
       {/* SHOWCASE SECTION 2: TRENDING */}
       {settings.show_trending && trendingProducts.length > 0 && (
         <ShowcaseSection
-          title="Trending This Month"
-          subtitle="Hot Right Now"
-          badgeText="Hot Right Now"
+          title={isBangla ? 'এই মাসের ট্রেন্ডিং' : 'Trending This Month'}
+          subtitle={isBangla ? 'জনপ্রিয় পণ্যসমূহ' : 'Hot Right Now'}
+          badgeText={isBangla ? 'জনপ্রিয় ট্রেন্ড' : 'Hot Right Now'}
           type="trending"
           viewAllHref="/trending"
           products={trendingProducts}
@@ -202,9 +204,9 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
       {/* SHOWCASE SECTION 3: BEST SELLERS */}
       {settings.show_best_seller && bestSellerProducts.length > 0 && (
         <ShowcaseSection
-          title="All-Time Best Sellers"
-          subtitle="Customer Favorites"
-          badgeText="Customer Favorites"
+          title={isBangla ? 'সর্বকালের সেরা বিক্রিত' : 'All-Time Best Sellers'}
+          subtitle={isBangla ? 'গ্রাহকদের পছন্দের পণ্য' : 'Customer Favorites'}
+          badgeText={isBangla ? 'গ্রাহকদের পছন্দ' : 'Customer Favorites'}
           type="best_seller"
           viewAllHref="/best-seller"
           products={bestSellerProducts}
@@ -219,8 +221,12 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
         {/* Search & Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-6 pb-6 sm:pb-8 border-b border-slate-200">
           <div>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-950">Explore All Products</h2>
-            <p className="mt-0.5 sm:mt-1 text-xs text-slate-500">Showing {filteredProducts.length} items</p>
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-950">{t('nav.all_products')}</h2>
+            <p className="mt-0.5 sm:mt-1 text-xs text-slate-500">
+              {isBangla 
+                ? `${toBengaliDigits(filteredProducts.length)} টি পণ্য প্রদর্শিত হচ্ছে` 
+                : `Showing ${filteredProducts.length} items`}
+            </p>
           </div>
           
           {/* Search Bar */}
@@ -228,7 +234,7 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search catalog..."
+              placeholder={t('common.search')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-4 text-xs outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all"
@@ -246,7 +252,7 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
                 : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
             }`}
           >
-            All Products
+            {t('nav.all_products')}
           </button>
           {parentCategories.map((category) => (
             <button
@@ -267,8 +273,8 @@ export default function HomePageClient({ products, categories, allTimeSales = {}
         {filteredProducts.length === 0 ? (
           <div className="text-center py-16 sm:py-20 bg-white rounded-xl border border-dashed border-slate-300">
             <Filter className="h-8 w-8 sm:h-10 sm:w-10 text-slate-400 mx-auto mb-3" />
-            <p className="text-sm sm:text-base font-bold text-slate-900">No products found</p>
-            <p className="mt-1 text-xs text-slate-500">Try matching a different category or search term.</p>
+            <p className="text-sm sm:text-base font-bold text-slate-900">{isBangla ? 'কোনো পণ্য পাওয়া যায়নি' : 'No products found'}</p>
+            <p className="mt-1 text-xs text-slate-500">{isBangla ? 'অনুগ্রহ করে অন্য ক্যাটাগরি বা অনুসন্ধানী শব্দ দিয়ে চেষ্টা করুন।' : 'Try matching a different category or search term.'}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">

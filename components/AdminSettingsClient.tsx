@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
+import { useLanguage } from '@/context/LanguageContext'
 import { StoreSettings } from '@/utils/settings'
 import { formatExternalUrl } from '@/utils/url'
 import { THEME_PALETTES } from '@/utils/theme'
@@ -25,9 +26,10 @@ interface AdminSettingsClientProps {
 export default function AdminSettingsClient({ initialSettings }: AdminSettingsClientProps) {
   const router = useRouter()
   const supabase = createClient()
+  const { t, isBangla } = useLanguage()
 
   const [settings, setSettings] = useState<StoreSettings>(initialSettings)
-  const [activeTab, setActiveTab] = useState<'branding' | 'hero' | 'collections' | 'payment' | 'shipping' | 'about'>('branding')
+  const [activeTab, setActiveTab] = useState<'branding' | 'hero' | 'collections' | 'payment' | 'shipping' | 'tracking' | 'about'>('branding')
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
@@ -156,6 +158,16 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
               <Truck className="h-4 w-4" /> Courier & Shipping
             </button>
             <button
+              onClick={() => setActiveTab('tracking')}
+              className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${
+                activeTab === 'tracking'
+                  ? 'border-brand-600 text-brand-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <Share2 className="h-4 w-4" /> Ads & Social
+            </button>
+            <button
               onClick={() => setActiveTab('about')}
               className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${
                 activeTab === 'about'
@@ -163,7 +175,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                   : 'border-transparent text-slate-500 hover:text-slate-900'
               }`}
             >
-              <Info className="h-4 w-4" /> About & Contact Info
+              <Info className="h-4 w-4" /> About & Contact
             </button>
           </div>
 
@@ -229,6 +241,31 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                       onChange={(urls) => setSettings({ ...settings, favicon_url: Array.isArray(urls) ? (urls[0] || '') : (urls || '') })}
                     />
                   </div>
+                </div>
+
+                {/* Optional Watermark Toggle */}
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 block">Product Photo Logo Watermark</span>
+                    <span className="text-[11px] text-slate-500 block mt-0.5">
+                      Automatically stamp your store logo watermark in the bottom-right corner of new product photos upon upload.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={settings.watermark_enabled}
+                    onClick={() => setSettings({ ...settings, watermark_enabled: !settings.watermark_enabled })}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      settings.watermark_enabled ? 'bg-brand-600' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        settings.watermark_enabled ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
 
                 {/* 8 Curated Theme Color Palettes */}
@@ -937,35 +974,81 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                 <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
                   <div>
                     <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                      Standard Shipping Fees
+                      Flexible Shipping Zones & Base Delivery Charges
                     </h3>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      Base delivery charges calculated at checkout based on the customer's delivery destination.
+                      Configure your shop's primary city and customized zone names. Checkout will automatically match the customer's city and calculate the correct fee.
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        Delivery Charge: Inside Dhaka (৳)
-                      </label>
-                      <input
-                        type="number"
-                        value={settings.delivery_charge_inside_dhaka}
-                        onChange={(e) => setSettings({ ...settings, delivery_charge_inside_dhaka: Number(e.target.value) })}
-                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
-                      />
+                  {/* Store Primary City */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Store Base / Origin City
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.store_city_name || 'Dhaka'}
+                      onChange={(e) => setSettings({ ...settings, store_city_name: e.target.value })}
+                      placeholder="e.g. Dhaka, Chittagong, Sylhet, Khulna, Rajshahi"
+                      className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Orders destined for this city will receive the Zone 1 (Local) rate.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-200/80">
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                          Zone 1 (Local Area) Label
+                        </label>
+                        <input
+                          type="text"
+                          value={settings.shipping_zone_1_label || 'Inside Dhaka'}
+                          onChange={(e) => setSettings({ ...settings, shipping_zone_1_label: e.target.value })}
+                          placeholder="e.g. Inside Dhaka"
+                          className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                          Zone 1 Delivery Fee (৳)
+                        </label>
+                        <input
+                          type="number"
+                          value={settings.delivery_charge_inside_dhaka}
+                          onChange={(e) => setSettings({ ...settings, delivery_charge_inside_dhaka: Number(e.target.value) })}
+                          className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-bold"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        Delivery Charge: Outside Dhaka (৳)
-                      </label>
-                      <input
-                        type="number"
-                        value={settings.delivery_charge_outside_dhaka}
-                        onChange={(e) => setSettings({ ...settings, delivery_charge_outside_dhaka: Number(e.target.value) })}
-                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
-                      />
+
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                          Zone 2 (Nationwide / Out of City) Label
+                        </label>
+                        <input
+                          type="text"
+                          value={settings.shipping_zone_2_label || 'Outside Dhaka'}
+                          onChange={(e) => setSettings({ ...settings, shipping_zone_2_label: e.target.value })}
+                          placeholder="e.g. Outside Dhaka"
+                          className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                          Zone 2 Delivery Fee (৳)
+                        </label>
+                        <input
+                          type="number"
+                          value={settings.delivery_charge_outside_dhaka}
+                          onChange={(e) => setSettings({ ...settings, delivery_charge_outside_dhaka: Number(e.target.value) })}
+                          className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-bold"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1423,6 +1506,187 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                       />
                     </div>
                   )}
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* TAB: ADS & TRACKING PIXELS */}
+          {activeTab === 'tracking' && (
+            <div className="bg-white rounded-b-lg border border-t-0 border-slate-200 p-6 space-y-8 shadow-sm">
+              <div className="max-w-2xl space-y-6">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">Marketing, Ads Tracking Pixels & Social Channels</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Connect your Facebook & Instagram Meta Pixel, Google Analytics 4, TikTok Pixel, and official social media accounts.
+                  </p>
+                </div>
+
+                {/* 1. AD PIXEL INTEGRATIONS */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+                    <Sparkles className="h-4 w-4 text-brand-600" />
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                      Advertising & Analytics Pixels
+                    </h3>
+                  </div>
+
+                  {/* Meta (Facebook / Instagram) Pixel */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase flex items-center justify-between">
+                      <span>Meta Pixel ID (Facebook / Instagram Ads)</span>
+                      <span className="text-[10px] font-normal text-slate-400">e.g. 123456789012345</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.meta_pixel_id || ''}
+                      onChange={(e) => setSettings({ ...settings, meta_pixel_id: e.target.value })}
+                      placeholder="Paste your 15-16 digit Meta Pixel ID"
+                      className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                    />
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Find this in your <strong>Meta Events Manager</strong>. The pixel script will automatically inject into all storefront pages and track page views.
+                    </p>
+                  </div>
+
+                  {/* Google Analytics 4 (GA4) */}
+                  <div className="space-y-1.5 pt-2 border-t border-slate-200/60">
+                    <label className="block text-xs font-bold text-slate-700 uppercase flex items-center justify-between">
+                      <span>Google Analytics 4 Measurement ID</span>
+                      <span className="text-[10px] font-normal text-slate-400">e.g. G-XXXXXXXXXX</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.google_analytics_id || ''}
+                      onChange={(e) => setSettings({ ...settings, google_analytics_id: e.target.value })}
+                      placeholder="G-XXXXXXXXXX"
+                      className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                    />
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Find this in Google Analytics under <strong>Admin &gt; Data Streams &gt; Measurement ID</strong>.
+                    </p>
+                  </div>
+
+                  {/* TikTok Pixel */}
+                  <div className="space-y-1.5 pt-2 border-t border-slate-200/60">
+                    <label className="block text-xs font-bold text-slate-700 uppercase flex items-center justify-between">
+                      <span>TikTok Pixel ID</span>
+                      <span className="text-[10px] font-normal text-slate-400">e.g. CXXXXXXXXXXXXXXX</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.tiktok_pixel_id || ''}
+                      onChange={(e) => setSettings({ ...settings, tiktok_pixel_id: e.target.value })}
+                      placeholder="TikTok Pixel ID from TikTok Ads Manager"
+                      className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                    />
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Find this in TikTok Ads Manager under <strong>Assets &gt; Events &gt; Web Events</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. SOCIAL MEDIA LINKS */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+                    <Share2 className="h-4 w-4 text-brand-600" />
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                      Store Social Media Profiles
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Facebook */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        Facebook Page URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_facebook || ''}
+                        onChange={(e) => setSettings({ ...settings, social_facebook: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_facebook: formatExternalUrl(e.target.value) })}
+                        placeholder="https://facebook.com/yourpage"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+
+                    {/* Instagram */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        Instagram Profile URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_instagram || ''}
+                        onChange={(e) => setSettings({ ...settings, social_instagram: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_instagram: formatExternalUrl(e.target.value) })}
+                        placeholder="https://instagram.com/yourhandle"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+
+                    {/* YouTube */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        YouTube Channel URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_youtube || ''}
+                        onChange={(e) => setSettings({ ...settings, social_youtube: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_youtube: formatExternalUrl(e.target.value) })}
+                        placeholder="https://youtube.com/@yourchannel"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+
+                    {/* TikTok */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        TikTok Profile URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_tiktok || ''}
+                        onChange={(e) => setSettings({ ...settings, social_tiktok: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_tiktok: formatExternalUrl(e.target.value) })}
+                        placeholder="https://tiktok.com/@yourhandle"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+
+                    {/* Twitter / X */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        X (Twitter) Profile URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_twitter || ''}
+                        onChange={(e) => setSettings({ ...settings, social_twitter: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_twitter: formatExternalUrl(e.target.value) })}
+                        placeholder="https://x.com/yourhandle"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+
+                    {/* LinkedIn */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        LinkedIn Page URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_linkedin || ''}
+                        onChange={(e) => setSettings({ ...settings, social_linkedin: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_linkedin: formatExternalUrl(e.target.value) })}
+                        placeholder="https://linkedin.com/company/yourcompany"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+                  </div>
                 </div>
 
               </div>

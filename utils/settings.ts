@@ -7,6 +7,7 @@ export interface StoreSettings {
   store_tagline: string
   logo_url: string
   favicon_url: string
+  watermark_enabled: boolean
   // Hero Section
   hero_image_url: string
   hero_badge_text: string
@@ -38,7 +39,11 @@ export interface StoreSettings {
   steadfast_api_key: string
   steadfast_secret_key: string
   steadfast_base_url: string
-  // Delivery Charges
+  // Flexible Shipping & Delivery Charges
+  store_city_name: string
+  store_city_id: number
+  shipping_zone_1_label: string
+  shipping_zone_2_label: string
   delivery_charge_inside_dhaka: number
   delivery_charge_outside_dhaka: number
   // About & Contact Details
@@ -56,6 +61,10 @@ export interface StoreSettings {
   social_tiktok: string
   social_twitter: string
   social_linkedin: string
+  // Marketing & Tracking Pixels
+  meta_pixel_id: string
+  google_analytics_id: string
+  tiktok_pixel_id: string
   // Special Collections
   show_featured: boolean
   show_best_seller: boolean
@@ -70,6 +79,7 @@ export interface PublicStoreSettings {
   store_tagline: string
   logo_url: string
   favicon_url: string
+  watermark_enabled: boolean
   hero_image_url: string
   hero_badge_text: string
   hero_title: string
@@ -82,6 +92,10 @@ export interface PublicStoreSettings {
   pathao_enabled: boolean
   steadfast_enabled: boolean
   active_shipping_provider: 'pathao' | 'steadfast'
+  store_city_name: string
+  store_city_id: number
+  shipping_zone_1_label: string
+  shipping_zone_2_label: string
   delivery_charge_inside_dhaka: number
   delivery_charge_outside_dhaka: number
   about_enabled: boolean
@@ -97,6 +111,9 @@ export interface PublicStoreSettings {
   social_tiktok: string
   social_twitter: string
   social_linkedin: string
+  meta_pixel_id: string
+  google_analytics_id: string
+  tiktok_pixel_id: string
   show_featured: boolean
   show_best_seller: boolean
   show_trending: boolean
@@ -109,6 +126,7 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   store_tagline: 'Premium Aquariums, Accessories & Aquatic Plants in Bangladesh',
   logo_url: '/logo.jpeg',
   favicon_url: '/logo.jpeg',
+  watermark_enabled: false,
   hero_image_url: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=1600',
   hero_badge_text: 'Premium Aquascaping Shop',
   hero_title: 'Create Your Own',
@@ -135,6 +153,10 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   steadfast_api_key: process.env.STEADFAST_API_KEY || '',
   steadfast_secret_key: process.env.STEADFAST_SECRET_KEY || '',
   steadfast_base_url: process.env.STEADFAST_BASE_URL || 'https://portal.steadfast.com.bd/api/v1',
+  store_city_name: 'Dhaka',
+  store_city_id: 1,
+  shipping_zone_1_label: 'Inside Dhaka',
+  shipping_zone_2_label: 'Outside Dhaka',
   delivery_charge_inside_dhaka: 60,
   delivery_charge_outside_dhaka: 120,
   about_enabled: true,
@@ -150,6 +172,9 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   social_tiktok: '',
   social_twitter: '',
   social_linkedin: '',
+  meta_pixel_id: '',
+  google_analytics_id: '',
+  tiktok_pixel_id: '',
   show_featured: true,
   show_best_seller: true,
   show_trending: true,
@@ -183,11 +208,16 @@ export async function getStoreSettings(forceFresh = false): Promise<StoreSetting
     const resolved: StoreSettings = {
       ...DEFAULT_SETTINGS,
       ...data,
+      watermark_enabled: data.watermark_enabled !== undefined ? Boolean(data.watermark_enabled) : DEFAULT_SETTINGS.watermark_enabled,
       cod_enabled: data.cod_enabled !== undefined ? Boolean(data.cod_enabled) : DEFAULT_SETTINGS.cod_enabled,
       cod_prepay_delivery: data.cod_prepay_delivery !== undefined ? Boolean(data.cod_prepay_delivery) : DEFAULT_SETTINGS.cod_prepay_delivery,
       bkash_enabled: data.bkash_enabled !== undefined ? Boolean(data.bkash_enabled) : DEFAULT_SETTINGS.bkash_enabled,
       pathao_enabled: data.pathao_enabled !== undefined ? Boolean(data.pathao_enabled) : DEFAULT_SETTINGS.pathao_enabled,
       steadfast_enabled: data.steadfast_enabled !== undefined ? Boolean(data.steadfast_enabled) : DEFAULT_SETTINGS.steadfast_enabled,
+      store_city_name: data.store_city_name || DEFAULT_SETTINGS.store_city_name,
+      store_city_id: Number(data.store_city_id ?? DEFAULT_SETTINGS.store_city_id),
+      shipping_zone_1_label: data.shipping_zone_1_label || DEFAULT_SETTINGS.shipping_zone_1_label,
+      shipping_zone_2_label: data.shipping_zone_2_label || DEFAULT_SETTINGS.shipping_zone_2_label,
       delivery_charge_inside_dhaka: Number(data.delivery_charge_inside_dhaka ?? DEFAULT_SETTINGS.delivery_charge_inside_dhaka),
       delivery_charge_outside_dhaka: Number(data.delivery_charge_outside_dhaka ?? DEFAULT_SETTINGS.delivery_charge_outside_dhaka),
       about_enabled: data.about_enabled !== undefined ? Boolean(data.about_enabled) : DEFAULT_SETTINGS.about_enabled,
@@ -203,6 +233,9 @@ export async function getStoreSettings(forceFresh = false): Promise<StoreSetting
       social_tiktok: data.social_tiktok ?? '',
       social_twitter: data.social_twitter ?? '',
       social_linkedin: data.social_linkedin ?? '',
+      meta_pixel_id: data.meta_pixel_id ?? '',
+      google_analytics_id: data.google_analytics_id ?? '',
+      tiktok_pixel_id: data.tiktok_pixel_id ?? '',
       show_featured: data.show_featured !== undefined ? Boolean(data.show_featured) : DEFAULT_SETTINGS.show_featured,
       show_best_seller: data.show_best_seller !== undefined ? Boolean(data.show_best_seller) : DEFAULT_SETTINGS.show_best_seller,
       show_trending: data.show_trending !== undefined ? Boolean(data.show_trending) : DEFAULT_SETTINGS.show_trending,
@@ -225,6 +258,7 @@ export async function getPublicSettings(): Promise<PublicStoreSettings> {
     store_tagline: full.store_tagline,
     logo_url: full.logo_url || DEFAULT_SETTINGS.logo_url,
     favicon_url: full.favicon_url || full.logo_url || DEFAULT_SETTINGS.favicon_url,
+    watermark_enabled: full.watermark_enabled,
     hero_image_url: full.hero_image_url || DEFAULT_SETTINGS.hero_image_url,
     hero_badge_text: full.hero_badge_text,
     hero_title: full.hero_title,
@@ -237,6 +271,10 @@ export async function getPublicSettings(): Promise<PublicStoreSettings> {
     pathao_enabled: full.pathao_enabled,
     steadfast_enabled: full.steadfast_enabled,
     active_shipping_provider: full.active_shipping_provider || 'pathao',
+    store_city_name: full.store_city_name,
+    store_city_id: full.store_city_id,
+    shipping_zone_1_label: full.shipping_zone_1_label,
+    shipping_zone_2_label: full.shipping_zone_2_label,
     delivery_charge_inside_dhaka: full.delivery_charge_inside_dhaka,
     delivery_charge_outside_dhaka: full.delivery_charge_outside_dhaka,
     about_enabled: full.about_enabled,
@@ -252,6 +290,9 @@ export async function getPublicSettings(): Promise<PublicStoreSettings> {
     social_tiktok: full.social_tiktok,
     social_twitter: full.social_twitter,
     social_linkedin: full.social_linkedin,
+    meta_pixel_id: full.meta_pixel_id,
+    google_analytics_id: full.google_analytics_id,
+    tiktok_pixel_id: full.tiktok_pixel_id,
     show_featured: full.show_featured,
     show_best_seller: full.show_best_seller,
     show_trending: full.show_trending,

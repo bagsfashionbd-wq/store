@@ -6,6 +6,7 @@ import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import CartDrawer from '@/components/CartDrawer'
 import { useStore } from '@/context/StoreContext'
+import { useLanguage } from '@/context/LanguageContext'
 import { formatGoogleMapsEmbedUrl } from '@/utils/map'
 import { formatExternalUrl } from '@/utils/url'
 import { 
@@ -24,6 +25,7 @@ function getWhatsAppUrl(num: string, storeName: string) {
 
 export default function ContactPageClient() {
   const { settings } = useStore()
+  const { t, isBangla } = useLanguage()
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false)
 
   const [name, setName] = useState('')
@@ -110,12 +112,12 @@ export default function ContactPageClient() {
     setErrorMsg('')
 
     if (!name.trim() || !phone.trim() || !message.trim()) {
-      setErrorMsg('Please fill in your name, phone number, and message.')
+      setErrorMsg(isBangla ? 'অনুগ্রহ করে নাম, ফোন নম্বর এবং বার্তা প্রদান করুন।' : 'Please fill in your name, phone number, and message.')
       return
     }
 
     if (phone.trim().length < 11) {
-      setErrorMsg('Please enter a valid 11-digit phone number.')
+      setErrorMsg(isBangla ? 'সঠিক ১১ ডিজিটের ফোন নম্বর লিখুন।' : 'Please enter a valid 11-digit phone number.')
       return
     }
 
@@ -138,11 +140,10 @@ export default function ContactPageClient() {
         setSubject('')
         setMessage('')
       } else {
-        throw new Error(response.data?.error || 'Failed to submit message')
+        setErrorMsg(response.data?.error || (isBangla ? 'বার্তা পাঠাতে সমস্যা হয়েছে।' : 'Failed to send message.'))
       }
     } catch (err: any) {
-      console.error(err)
-      setErrorMsg(err.response?.data?.error || err.message || 'Something went wrong. Please try again or contact us directly.')
+      setErrorMsg(err.response?.data?.error || (isBangla ? 'বার্তা পাঠাতে সমস্যা হয়েছে। আবার চেষ্টা করুন।' : 'Error sending message. Please try again.'))
     } finally {
       setLoading(false)
     }
@@ -152,56 +153,59 @@ export default function ContactPageClient() {
     <div className="flex flex-col min-h-screen bg-slate-50 text-slate-800">
       <Navbar onCartToggle={() => setCartDrawerOpen(true)} />
 
-      {/* Header */}
-      <section className="bg-slate-950 text-white py-14 sm:py-18 relative overflow-hidden">
-        <div className="absolute inset-0 z-0 opacity-20 bg-cover bg-center" style={{ backgroundImage: `url(${settings.hero_image_url || '/logo.jpeg'})` }} />
+      {/* Hero */}
+      <section className="bg-slate-950 text-white py-14 sm:py-20 relative overflow-hidden">
+        <div className="absolute inset-0 z-0 opacity-25 bg-cover bg-center" style={{ backgroundImage: `url(${settings.hero_image_url || '/logo.jpeg'})` }} />
         <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900/90 to-transparent z-0" />
-        
+
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-            <Link href="/" className="hover:text-brand-400">Home</Link>
+            <Link href="/" className="hover:text-brand-400">{t('nav.home')}</Link>
             <ChevronRight className="h-3 w-3" />
-            <span className="text-brand-400">Contact Us</span>
+            <span className="text-brand-400">{t('contact.contact_us')}</span>
           </div>
           <h1 className="text-3xl font-black tracking-tight sm:text-5xl text-white">
-            Get In Touch
+            {t('contact.contact_us')}
           </h1>
           <p className="mt-3 text-sm text-slate-300 max-w-xl">
-            Have questions about products, delivery, or custom orders? Reach out to us anytime and our team will get back to you promptly.
+            {t('contact.contact_subtitle')}
           </p>
         </div>
       </section>
 
-      {/* Main Content */}
+      {/* Main Container */}
       <main className="flex-1 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* Left: Contact Form */}
-          <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+          <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-6 sm:p-10 shadow-sm space-y-6">
+            <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+              <div className="rounded-xl bg-brand-50 p-2.5 text-brand-600">
+                <MessageSquare className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-slate-950">{t('contact.send_message')}</h2>
+                <p className="text-xs text-slate-500">{isBangla ? 'আমাদের সহায়তা টিম খুব দ্রুত আপনার সাথে যোগাযোগ করবে' : 'Our support team will get back to you as soon as possible'}</p>
+              </div>
+            </div>
+
             {submitted ? (
-              <div className="text-center py-12 space-y-4">
-                <div className="flex justify-center">
-                  <CheckCircle2 className="h-16 w-16 text-brand-600 bg-brand-50 rounded-full p-2" />
-                </div>
-                <h2 className="text-2xl font-black text-slate-900">Thank You!</h2>
-                <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-                  Your message has been sent successfully. Our team has received it and will get in touch with you shortly.
+              <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-6 text-center space-y-3 animate-fade-in">
+                <CheckCircle2 className="h-10 w-10 text-emerald-600 mx-auto" />
+                <h3 className="text-sm font-bold text-emerald-950">{t('contact.message_sent_success')}</h3>
+                <p className="text-xs text-emerald-700 leading-relaxed max-w-md mx-auto">
+                  {isBangla ? 'আপনার বার্তাটি গ্রহণ করা হয়েছে। আমরা দ্রুত আপনার সাথে যোগাযোগ করব।' : 'Thank you for reaching out! We have received your message and will get back to you via phone or email shortly.'}
                 </p>
                 <button
                   type="button"
                   onClick={() => setSubmitted(false)}
-                  className="mt-4 rounded-xl bg-brand-600 px-6 py-2.5 text-xs font-bold text-white shadow hover:bg-brand-500 transition"
+                  className="mt-2 inline-block rounded-xl bg-emerald-600 px-5 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition shadow"
                 >
-                  Send Another Message
+                  {isBangla ? 'আরেকটি বার্তা পাঠান' : 'Send Another Message'}
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                  <h2 className="text-base font-bold text-slate-900">Send Us a Direct Message</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Fill in the form below and we will respond as soon as possible.</p>
-                </div>
-
+              <form onSubmit={handleSubmit} className="space-y-4">
                 {errorMsg && (
                   <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-semibold">
                     <AlertCircle className="h-4 w-4 flex-shrink-0" />
@@ -211,18 +215,18 @@ export default function ContactPageClient() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 uppercase">Your Name *</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase">{t('contact.your_name')} *</label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Shakib Ahmed"
+                      placeholder={isBangla ? 'আপনার নাম' : 'John Doe'}
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 uppercase">Phone Number *</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase">{t('contact.phone_number')} *</label>
                     <input
                       type="tel"
                       required
@@ -236,7 +240,7 @@ export default function ContactPageClient() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 uppercase">Email Address (Optional)</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase">{t('contact.email_address')}</label>
                     <input
                       type="email"
                       placeholder="you@example.com"
@@ -246,10 +250,10 @@ export default function ContactPageClient() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 uppercase">Subject / Inquiry Topic</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase">{t('contact.subject')}</label>
                     <input
                       type="text"
-                      placeholder="e.g. Custom Tank Size Inquiry"
+                      placeholder={isBangla ? 'বিষয় বা প্রশ্ন' : 'e.g. Order Inquiry'}
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all"
@@ -258,11 +262,11 @@ export default function ContactPageClient() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 uppercase">Your Message *</label>
+                  <label className="text-xs font-bold text-slate-700 uppercase">{t('contact.your_message')} *</label>
                   <textarea
                     rows={4}
                     required
-                    placeholder="Write your message, question, or request in detail..."
+                    placeholder={isBangla ? 'আপনার বার্তা বিস্তারিত লিখুন...' : 'Write your message, question, or request in detail...'}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all leading-relaxed"
@@ -277,12 +281,12 @@ export default function ContactPageClient() {
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Sending Message...</span>
+                      <span>{t('contact.sending')}</span>
                     </>
                   ) : (
                     <>
                       <Send className="h-4 w-4" />
-                      <span>Send Message</span>
+                      <span>{t('contact.send_button')}</span>
                     </>
                   )}
                 </button>
@@ -294,7 +298,7 @@ export default function ContactPageClient() {
           <div className="lg:col-span-5 space-y-6">
             <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
               <h2 className="text-base font-bold text-slate-900 pb-3 border-b border-slate-100">
-                Direct Contact Details
+                {t('contact.contact_info')}
               </h2>
 
               <div className="space-y-4 text-xs">
@@ -304,7 +308,7 @@ export default function ContactPageClient() {
                       <Phone className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="font-bold text-slate-900">Phone Support</p>
+                      <p className="font-bold text-slate-900">{isBangla ? 'ফোন সহায়তা' : 'Phone Support'}</p>
                       <a href={`tel:${settings.contact_phone.replace(/\s+/g, '')}`} className="text-slate-600 hover:text-brand-600 transition mt-0.5 block">
                         {settings.contact_phone}
                       </a>
@@ -318,7 +322,7 @@ export default function ContactPageClient() {
                       <MessageCircle className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="font-bold text-slate-900">WhatsApp Direct Chat</p>
+                      <p className="font-bold text-slate-900">{isBangla ? 'হোয়াটসঅ্যাপ সরাসরি চ্যাট' : 'WhatsApp Direct Chat'}</p>
                       <a
                         href={getWhatsAppUrl(settings.contact_whatsapp, settings.store_name)}
                         target="_blank"
@@ -326,7 +330,7 @@ export default function ContactPageClient() {
                         className="text-emerald-700 font-bold hover:underline mt-0.5 inline-flex items-center gap-1.5"
                       >
                         <span>{settings.contact_whatsapp}</span>
-                        <span className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200 px-1.5 py-0.2 rounded font-semibold">Chat Online</span>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200 px-1.5 py-0.2 rounded font-semibold">{isBangla ? 'অনলাইন চ্যাট' : 'Chat Online'}</span>
                       </a>
                     </div>
                   </div>
@@ -338,7 +342,7 @@ export default function ContactPageClient() {
                       <Mail className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="font-bold text-slate-900">Email Support</p>
+                      <p className="font-bold text-slate-900">{isBangla ? 'ইমেইল সহায়তা' : 'Email Support'}</p>
                       <a href={`mailto:${settings.contact_email}`} className="text-slate-600 hover:text-brand-600 transition mt-0.5 block">
                         {settings.contact_email}
                       </a>
@@ -352,56 +356,45 @@ export default function ContactPageClient() {
                       <MapPin className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="font-bold text-slate-900">Store Address</p>
+                      <p className="font-bold text-slate-900">{isBangla ? 'দোকানের ঠিকানা' : 'Store Address'}</p>
                       <p className="text-slate-600 mt-0.5 leading-relaxed">{settings.contact_address}</p>
                     </div>
                   </div>
                 )}
+              </div>
 
-                <div className="flex items-start gap-3">
-                  <div className="rounded-xl bg-brand-50 p-2.5 text-brand-600">
-                    <Clock className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-900">Response Time</p>
-                    <p className="text-slate-600 mt-0.5">Saturday - Thursday: 10:00 AM - 9:00 PM</p>
+              {/* Social Channels */}
+              {socialLinks.length > 0 && (
+                <div className="pt-4 border-t border-slate-100 space-y-2">
+                  <p className="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
+                    <Share2 className="h-3.5 w-3.5 text-brand-600" /> {isBangla ? 'সোশ্যাল মিডিয়ায় যুক্ত হোন' : 'Connect on Social Media'}
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {socialLinks.map((s) => (
+                      <a
+                        key={s.key}
+                        href={s.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold transition shadow-xs ${s.color}`}
+                      >
+                        <span className="flex-shrink-0">{s.icon}</span>
+                        <span>{s.name}</span>
+                        <ArrowRight className="h-3 w-3 opacity-50 ml-0.5" />
+                      </a>
+                    ))}
                   </div>
                 </div>
-
-                {/* Social Media Channels */}
-                {socialLinks.length > 0 && (
-                  <div className="pt-4 border-t border-slate-100 space-y-2">
-                    <p className="font-bold text-slate-900 flex items-center gap-1.5">
-                      <Share2 className="h-3.5 w-3.5 text-brand-600" /> Connect on Social Media
-                    </p>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {socialLinks.map((s) => (
-                        <a
-                          key={s.key}
-                          href={s.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold transition shadow-xs ${s.color}`}
-                        >
-                          <span className="flex-shrink-0">{s.icon}</span>
-                          <span>{s.name}</span>
-                          <ArrowRight className="h-3 w-3 opacity-50 ml-0.5" />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
 
-            {/* Google Map if available */}
+            {/* Google Map */}
             {settings.google_map_embed_url && (
-              <div className="bg-white rounded-2xl border border-slate-200 p-2 shadow-sm overflow-hidden aspect-video bg-slate-100">
+              <div className="rounded-2xl overflow-hidden border border-slate-200 aspect-video shadow-sm bg-slate-100">
                 <iframe
                   src={formatGoogleMapsEmbedUrl(settings.google_map_embed_url)}
                   width="100%"
                   height="100%"
-                  className="rounded-xl"
                   style={{ border: 0 }}
                   loading="lazy"
                   title="Store Location Map"

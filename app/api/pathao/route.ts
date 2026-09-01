@@ -3,6 +3,8 @@ import { getStoreSettings } from '@/utils/settings'
 import { getPathaoToken } from '@/utils/courier'
 import axios from 'axios'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const action = searchParams.get('action')

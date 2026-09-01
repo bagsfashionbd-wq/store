@@ -36,11 +36,11 @@ export function StoreProvider({
   const supabase = createClient()
 
   useEffect(() => {
-    // Check if user is logged in as admin for floating pill
+    // Check if user is logged in as staff/owner/admin for floating pill
     async function checkAdmin() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        if (user && (user.email === 'admin@example.com' || user.email?.includes('admin') || user.email === 'sakib.samadhan@gmail.com')) {
+        if (user) {
           setIsAdmin(true)
         } else {
           setIsAdmin(false)
@@ -54,7 +54,7 @@ export function StoreProvider({
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const user = session?.user
-      if (user && (user.email === 'admin@example.com' || user.email?.includes('admin') || user.email === 'sakib.samadhan@gmail.com')) {
+      if (user) {
         setIsAdmin(true)
       } else {
         setIsAdmin(false)

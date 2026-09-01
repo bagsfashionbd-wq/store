@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { getStoreSettings, invalidateSettingsCache, DEFAULT_SETTINGS, StoreSettings } from '@/utils/settings'
 import { formatExternalUrl } from '@/utils/url'
+import { verifyStaffAuth } from '@/utils/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,9 +18,14 @@ export async function GET() {
   }
 }
 
-// PUT: Update settings (Admin only)
+// PUT: Update settings (Shop Owner & Admin only)
 export async function PUT(request: NextRequest) {
   try {
+    const auth = await verifyStaffAuth(['shop_owner', 'admin'])
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
     const supabase = createAdminClient()
     const body: Partial<StoreSettings> = await request.json()
 
@@ -32,6 +38,7 @@ export async function PUT(request: NextRequest) {
       store_tagline: body.store_tagline !== undefined ? body.store_tagline : current.store_tagline,
       logo_url: body.logo_url !== undefined ? body.logo_url : current.logo_url,
       favicon_url: body.favicon_url !== undefined ? body.favicon_url : current.favicon_url,
+      watermark_enabled: body.watermark_enabled !== undefined ? Boolean(body.watermark_enabled) : current.watermark_enabled,
       hero_image_url: body.hero_image_url !== undefined ? body.hero_image_url : current.hero_image_url,
       hero_badge_text: body.hero_badge_text !== undefined ? body.hero_badge_text : current.hero_badge_text,
       hero_title: body.hero_title !== undefined ? body.hero_title : current.hero_title,
@@ -58,6 +65,10 @@ export async function PUT(request: NextRequest) {
       steadfast_api_key: body.steadfast_api_key !== undefined ? body.steadfast_api_key : current.steadfast_api_key,
       steadfast_secret_key: body.steadfast_secret_key !== undefined ? body.steadfast_secret_key : current.steadfast_secret_key,
       steadfast_base_url: body.steadfast_base_url !== undefined ? body.steadfast_base_url : current.steadfast_base_url,
+      store_city_name: body.store_city_name !== undefined ? body.store_city_name : current.store_city_name,
+      store_city_id: Number(body.store_city_id ?? current.store_city_id),
+      shipping_zone_1_label: body.shipping_zone_1_label !== undefined ? body.shipping_zone_1_label : current.shipping_zone_1_label,
+      shipping_zone_2_label: body.shipping_zone_2_label !== undefined ? body.shipping_zone_2_label : current.shipping_zone_2_label,
       delivery_charge_inside_dhaka: Number(body.delivery_charge_inside_dhaka ?? current.delivery_charge_inside_dhaka),
       delivery_charge_outside_dhaka: Number(body.delivery_charge_outside_dhaka ?? current.delivery_charge_outside_dhaka),
       about_enabled: body.about_enabled !== undefined ? Boolean(body.about_enabled) : current.about_enabled,
@@ -73,6 +84,9 @@ export async function PUT(request: NextRequest) {
       social_tiktok: body.social_tiktok !== undefined ? formatExternalUrl(body.social_tiktok) : current.social_tiktok,
       social_twitter: body.social_twitter !== undefined ? formatExternalUrl(body.social_twitter) : current.social_twitter,
       social_linkedin: body.social_linkedin !== undefined ? formatExternalUrl(body.social_linkedin) : current.social_linkedin,
+      meta_pixel_id: body.meta_pixel_id !== undefined ? body.meta_pixel_id.trim() : current.meta_pixel_id,
+      google_analytics_id: body.google_analytics_id !== undefined ? body.google_analytics_id.trim() : current.google_analytics_id,
+      tiktok_pixel_id: body.tiktok_pixel_id !== undefined ? body.tiktok_pixel_id.trim() : current.tiktok_pixel_id,
       show_featured: body.show_featured !== undefined ? Boolean(body.show_featured) : current.show_featured,
       show_best_seller: body.show_best_seller !== undefined ? Boolean(body.show_best_seller) : current.show_best_seller,
       show_trending: body.show_trending !== undefined ? Boolean(body.show_trending) : current.show_trending,

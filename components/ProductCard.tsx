@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { ShoppingBag, Eye, X, Check, ArrowRight } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
+import { useLanguage } from '@/context/LanguageContext'
 
 export interface VariationValue {
   label: string
@@ -21,6 +22,7 @@ export interface Product {
   category_id: string
   name: string
   slug: string
+  short_description?: string
   description?: string
   price: number
   old_price?: number
@@ -45,22 +47,20 @@ export interface Category {
 export function extractProductOptions(variations: any, fallbackStock = 0): VariationOption[] {
   if (!variations || typeof variations !== 'object') return []
 
-  // Check structured format { options: [...] }
   if (Array.isArray(variations.options)) {
-    const valid = variations.options
-      .filter((opt: any) => opt && opt.name && Array.isArray(opt.values) && opt.values.length > 0)
-      .map((opt: any) => ({
-        name: opt.name,
-        values: opt.values.map((v: any) => ({
-          label: typeof v === 'object' ? v.label : String(v),
-          stock: typeof v === 'object' && typeof v.stock === 'number' ? v.stock : fallbackStock,
-          image_url: typeof v === 'object' ? v.image_url : ''
-        }))
-      }))
-    if (valid.length > 0) return valid
+    return variations.options.map((opt: any) => ({
+      name: opt.name || 'Option',
+      values: Array.isArray(opt.values)
+        ? opt.values.map((v: any) => ({
+            label: typeof v === 'object' ? v.label || '' : String(v),
+            stock: typeof v === 'object' && typeof v.stock === 'number' ? v.stock : fallbackStock,
+            image_url: typeof v === 'object' ? v.image_url || '' : '',
+            price: typeof v === 'object' && v.price !== undefined && v.price !== null && v.price !== '' ? Number(v.price) : undefined
+          }))
+        : []
+    }))
   }
 
-  // Check legacy flat format e.g. { "sizes": ["1.5 Feet", "2 Feet"] }
   const options: VariationOption[] = []
   Object.entries(variations).forEach(([key, values]) => {
     if (key === 'category_ids' || key === 'options') return
@@ -71,7 +71,9 @@ export function extractProductOptions(variations: any, fallbackStock = 0): Varia
         name: cleanName,
         values: values.map((v: any) => ({
           label: String(v),
-          stock: stockPerVal
+          stock: stockPerVal,
+          image_url: '',
+          price: undefined
         }))
       })
     }
@@ -88,6 +90,7 @@ interface ProductCardProps {
 
 export default function ProductCard({ product, categories = [], onAddToCartSuccess }: ProductCardProps) {
   const { addToCart } = useCart()
+  const { t, toBengaliDigits, isBangla } = useLanguage()
   const [showVariantModal, setShowVariantModal] = useState(false)
   const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({})
   const modalRef = useRef<HTMLDivElement>(null)
@@ -182,7 +185,7 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
   const categoryName = categories
     .filter((c) => productCatIds.includes(c.id))
     .map((c) => c.name)
-    .join(', ') || 'Aquatics'
+    .join(', ') || (isBangla ? 'পণ্য' : 'Aquatics')
 
   return (
     <div className="group relative flex flex-col overflow-visible rounded-xl sm:rounded-2xl border border-slate-200 bg-white hover:shadow-xl hover:border-brand-300 transition-all duration-300">
@@ -198,14 +201,14 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
         
         {product.old_price && product.old_price > 0 ? (
           <span className="absolute top-2 left-2 sm:top-3 sm:left-3 rounded-full bg-red-600 px-1.5 py-0.5 sm:px-2 sm:py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-white shadow">
-            Sale
+            {t('product.discount')}
           </span>
         ) : null}
 
         {product.stock <= 0 && (
           <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] flex items-center justify-center">
             <span className="bg-white/95 text-slate-900 font-black text-[10px] sm:text-xs px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full uppercase tracking-wider shadow">
-              Sold Out
+              {t('product.out_of_stock')}
             </span>
           </div>
         )}
@@ -223,11 +226,11 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
           </h3>
         </Link>
 
-        {product.description && (
-          <p className="hidden sm:block mt-1 text-xs text-slate-500 line-clamp-2 flex-grow">
-            {product.description}
+        {product.short_description && product.short_description.trim() ? (
+          <p className="hidden sm:block mt-1 text-xs text-slate-500 line-clamp-2 sm:line-clamp-3 flex-grow leading-relaxed">
+            {product.short_description.trim()}
           </p>
-        )}
+        ) : null}
 
         {/* Price & Action button bar */}
         <div className="mt-2.5 sm:mt-4 flex items-center justify-between pt-2 border-t border-slate-100">
@@ -244,14 +247,14 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
 
           {/* DUAL ACTIONS: Details & Add To Cart */}
           <div className="relative flex items-center gap-1 sm:gap-1.5">
-            {/* 1. Details Button (Icon on mobile, Icon + Text on larger screens) */}
+            {/* 1. Details Button */}
             <Link
               href={`/product/${product.slug}`}
               className="flex items-center gap-1 sm:gap-1.5 p-1.5 sm:px-2.5 sm:py-2 rounded-lg sm:rounded-xl border border-slate-200 text-slate-600 hover:text-brand-600 hover:border-brand-300 hover:bg-brand-50/50 text-[11px] sm:text-xs font-bold transition-colors"
-              title="View Product Details"
+              title={t('product.view_product')}
             >
               <Eye className="h-3.5 w-3.5" />
-              <span className="hidden md:inline">Details</span>
+              <span className="hidden md:inline">{t('common.view')}</span>
             </Link>
 
             {/* 2. Add To Cart Button */}
@@ -262,11 +265,11 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
                 className="flex items-center gap-1 rounded-lg sm:rounded-xl bg-brand-600 hover:bg-brand-500 text-white px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold shadow-sm transition-all active:scale-95"
               >
                 <ShoppingBag className="h-3.5 w-3.5" />
-                <span className="hidden xs:inline sm:inline">Cart</span>
+                <span className="hidden xs:inline sm:inline">{t('nav.cart')}</span>
               </button>
             ) : (
               <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-red-500 bg-red-50 px-1.5 py-1 sm:px-2 sm:py-1.5 rounded-lg sm:rounded-xl border border-red-100">
-                Out
+                {t('product.out_of_stock')}
               </span>
             )}
 
@@ -277,14 +280,14 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
                 className="absolute right-0 sm:right-0 bottom-full mb-3 z-50 w-64 sm:w-72 max-w-[85vw] rounded-2xl bg-white p-3.5 sm:p-4 shadow-2xl border-2 border-brand-500 animate-fade-in-up"
                 style={{ filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.15))' }}
               >
-                {/* Comic Speech Bubble Triangle Pointer (Bottom pointing to Cart button) */}
+                {/* Comic Speech Bubble Triangle Pointer */}
                 <div className="absolute -bottom-2 right-6 h-4 w-4 rotate-45 border-b-2 border-r-2 border-brand-500 bg-white" />
 
                 {/* Popover Header */}
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-slate-900 uppercase tracking-wide">Choose Variant</span>
-                    <span className="text-[10px] font-bold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded">Quick Add</span>
+                    <span className="text-xs font-black text-slate-900 uppercase tracking-wide">{t('product.options')}</span>
+                    <span className="text-[10px] font-bold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded">{t('product.select_variant')}</span>
                   </div>
                   <button
                     type="button"
@@ -339,9 +342,9 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
                   <span className="text-[11px] font-bold text-slate-500">
                     {currentStock > 0 ? (
-                      <span className="text-emerald-700">✓ {currentStock} in stock</span>
+                      <span className="text-emerald-700">✓ {isBangla ? toBengaliDigits(currentStock) : currentStock} {t('product.in_stock')}</span>
                     ) : (
-                      <span className="text-red-600">✕ Sold out</span>
+                      <span className="text-red-600">✕ {t('product.out_of_stock')}</span>
                     )}
                   </span>
 
@@ -351,7 +354,7 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
                     onClick={handleConfirmVariantAdd}
                     className="flex items-center gap-1 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:bg-slate-300 text-white px-3 py-1.5 text-xs font-bold shadow transition"
                   >
-                    <span>Add to Cart</span>
+                    <span>{t('product.add_to_cart')}</span>
                     <ArrowRight className="h-3 w-3" />
                   </button>
                 </div>

@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { ShoppingBag, Menu, X, ChevronDown, ChevronRight, ShieldCheck, ArrowRight } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useStore } from '@/context/StoreContext'
+import { useLanguage } from '@/context/LanguageContext'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 interface NavbarProps {
   onCartToggle: () => void
@@ -13,6 +15,7 @@ interface NavbarProps {
 export default function Navbar({ onCartToggle }: NavbarProps) {
   const { cartCount } = useCart()
   const { settings, categories, isAdmin } = useStore()
+  const { t, toBengaliDigits, isBangla } = useLanguage()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [mobileCategoriesExpanded, setMobileCategoriesExpanded] = useState(false)
   const [expandedMobileParent, setExpandedMobileParent] = useState<string | null>(null)
@@ -52,7 +55,7 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                 href="/"
                 className="text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-brand-600 px-3 py-2 rounded-md hover:bg-slate-50 transition-colors"
               >
-                Home
+                {t('nav.home')}
               </Link>
 
               {/* ALL CATEGORIES CASCADING DROPDOWN (3-TIER HIERARCHY) */}
@@ -61,7 +64,7 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                   type="button"
                   className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-brand-600 px-3 py-2 rounded-md hover:bg-slate-50 transition-colors"
                 >
-                  <span>All Categories</span>
+                  <span>{t('nav.all_categories')}</span>
                   <ChevronDown className="h-3.5 w-3.5 opacity-60 group-hover:rotate-180 transition-transform duration-200" />
                 </button>
 
@@ -89,7 +92,7 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                                   href={`/category/${parent.slug}`}
                                   className="flex items-center justify-between rounded-lg px-3 py-1.5 text-xs font-bold text-brand-700 bg-brand-50/60 hover:bg-brand-50 transition"
                                 >
-                                  <span>All {parent.name}</span>
+                                  <span>{t('nav.view_all')} {parent.name}</span>
                                   <ArrowRight className="h-3 w-3" />
                                 </Link>
                                 <div className="my-1 border-t border-slate-100" />
@@ -142,7 +145,7 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                   href="/featured"
                   className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-brand-600 px-3 py-2 rounded-md hover:bg-slate-50 transition-colors"
                 >
-                  <span>Featured</span>
+                  <span>{t('nav.featured')}</span>
                 </Link>
               )}
 
@@ -152,7 +155,7 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                   href="/trending"
                   className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-brand-600 px-3 py-2 rounded-md hover:bg-slate-50 transition-colors"
                 >
-                  <span>Trending</span>
+                  <span>{t('nav.trending')}</span>
                 </Link>
               )}
 
@@ -162,7 +165,7 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                   href="/best-seller"
                   className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-brand-600 px-3 py-2 rounded-md hover:bg-slate-50 transition-colors"
                 >
-                  <span>Best Seller</span>
+                  <span>{t('nav.best_seller')}</span>
                 </Link>
               )}
 
@@ -171,23 +174,26 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                   href="/about"
                   className="text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-brand-600 px-3 py-2 rounded-md hover:bg-slate-50 transition-colors"
                 >
-                  About Us
+                  {t('nav.about_us')}
                 </Link>
               )}
             </nav>
           </div>
 
-          {/* Action Icons: Track Order & Cart with Label */}
-          <div className="flex items-center gap-2.5">
+          {/* Action Icons: Language Switcher, Track Order & Cart with Label */}
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* Language Switcher */}
+            <LanguageSwitcher size="sm" className="hidden sm:inline-flex" />
+
             {/* Track Order beside Cart */}
             <Link
               href="/track"
               className="hidden sm:inline-flex items-center text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-brand-600 px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors shadow-sm"
             >
-              Track Order
+              {t('nav.track_order')}
             </Link>
 
-            {/* Cart Button with Icon & Label (Light Brand Accent with 30% Opacity Background) */}
+            {/* Cart Button with Icon & Label */}
             <button
               onClick={onCartToggle}
               className="relative flex items-center gap-2 rounded-xl bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/30 text-brand-900 px-3.5 py-2 text-xs font-bold transition-all shadow-sm"
@@ -195,10 +201,10 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
               aria-label="Shopping Cart"
             >
               <ShoppingBag className="h-4 w-4 text-brand-700" />
-              <span className="tracking-wide">Cart</span>
+              <span className="tracking-wide">{t('nav.cart')}</span>
               {cartCount > 0 && (
                 <span className="flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full bg-brand-600 text-[10px] font-black text-white">
-                  {cartCount}
+                  {isBangla ? toBengaliDigits(cartCount) : cartCount}
                 </span>
               )}
             </button>
@@ -217,13 +223,21 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
         {/* Mobile Navigation Dropdown */}
         {mobileMenuOpen && (
           <div className="border-t border-slate-200 bg-white px-4 py-4 lg:hidden max-h-[80vh] overflow-y-auto animate-fade-in-down">
+            {/* Language Switcher in Mobile Drawer */}
+            <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100 px-1">
+              <span className="text-xs font-bold text-slate-500">
+                {isBangla ? 'ভাষা পরিবর্তন (Language)' : 'Language (ভাষা)'}
+              </span>
+              <LanguageSwitcher size="sm" />
+            </div>
+
             <div className="flex flex-col space-y-1">
               <Link
                 href="/"
                 onClick={() => setMobileMenuOpen(false)}
                 className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50 hover:text-brand-600"
               >
-                Home
+                {t('nav.home')}
               </Link>
 
               {/* Mobile 3-Tier Categories Collapsible Accordion */}
@@ -234,9 +248,9 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                   className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50 hover:text-brand-600 transition-colors"
                 >
                   <span className="flex items-center gap-2">
-                    <span>All Categories</span>
+                    <span>{t('nav.all_categories')}</span>
                     <span className="text-[10px] bg-brand-50 text-brand-700 font-bold px-2 py-0.5 rounded-full border border-brand-200/60">
-                      {parentCategories.length}
+                      {isBangla ? toBengaliDigits(parentCategories.length) : parentCategories.length}
                     </span>
                   </span>
                   <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform duration-200 ${mobileCategoriesExpanded ? 'rotate-180 text-brand-600' : ''}`} />
@@ -277,7 +291,7 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                                 onClick={() => setMobileMenuOpen(false)}
                                 className="block text-xs font-bold text-brand-600 py-1"
                               >
-                                View All {parent.name}
+                                {t('nav.view_all')} {parent.name}
                               </Link>
                               {level2Children.map((level2) => {
                                 const level3Children = categories.filter((c) => c.parent_id === level2.id)
@@ -323,7 +337,7 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                   onClick={() => setMobileMenuOpen(false)}
                   className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50 hover:text-brand-600"
                 >
-                  Featured
+                  {t('nav.featured')}
                 </Link>
               )}
 
@@ -333,7 +347,7 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                   onClick={() => setMobileMenuOpen(false)}
                   className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50 hover:text-brand-600"
                 >
-                  Trending
+                  {t('nav.trending')}
                 </Link>
               )}
 
@@ -343,7 +357,7 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                   onClick={() => setMobileMenuOpen(false)}
                   className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50 hover:text-brand-600"
                 >
-                  Best Seller
+                  {t('nav.best_seller')}
                 </Link>
               )}
 
@@ -354,7 +368,7 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                     onClick={() => setMobileMenuOpen(false)}
                     className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50 hover:text-brand-600"
                   >
-                    About Us
+                    {t('nav.about_us')}
                   </Link>
                 )}
 
@@ -363,7 +377,7 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                   onClick={() => setMobileMenuOpen(false)}
                   className="block rounded-lg px-3 py-2 text-sm font-bold text-brand-600 bg-brand-50"
                 >
-                  Track Order
+                  {t('nav.track_order')}
                 </Link>
               </div>
             </div>

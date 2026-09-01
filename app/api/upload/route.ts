@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
+import { verifyStaffAuth } from '@/utils/auth'
+
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await verifyStaffAuth(['shop_owner', 'admin', 'staff'])
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
     const supabase = createAdminClient()
     const formData = await request.formData()
     const file = formData.get('file') as File | null
@@ -12,10 +20,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    // Size limit: 50MB (Supabase free tier max single file)
-    const MAX_SIZE = 50 * 1024 * 1024
+    // Size limit: 10MB
+    const MAX_SIZE = 10 * 1024 * 1024
     if (file.size > MAX_SIZE) {
-      return NextResponse.json({ error: 'File size exceeds 50MB limit' }, { status: 400 })
+      return NextResponse.json({ error: 'File size exceeds 10MB limit' }, { status: 400 })
     }
 
     // Supported formats

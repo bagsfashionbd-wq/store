@@ -13,6 +13,8 @@ import {
   HeartHandshake, ChevronRight, Store, ArrowRight, MessageCircle, Share2
 } from 'lucide-react'
 
+import { useLanguage } from '@/context/LanguageContext'
+
 // Helper for formatting WhatsApp URL
 function getWhatsAppUrl(num: string, storeName: string) {
   const digits = num.replace(/\D/g, '')
@@ -23,6 +25,7 @@ function getWhatsAppUrl(num: string, storeName: string) {
 
 export default function AboutPageClient() {
   const { settings } = useStore()
+  const { t, isBangla } = useLanguage()
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false)
 
   const socialLinks = [
@@ -105,15 +108,15 @@ export default function AboutPageClient() {
         
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-            <Link href="/" className="hover:text-brand-400">Home</Link>
+            <Link href="/" className="hover:text-brand-400">{t('nav.home')}</Link>
             <ChevronRight className="h-3 w-3" />
-            <span className="text-brand-400">About Us</span>
+            <span className="text-brand-400">{t('about.about_us')}</span>
           </div>
           <h1 className="text-3xl font-black tracking-tight sm:text-5xl text-white">
-            About {settings.store_name}
+            {isBangla ? `${settings.store_name} সম্পর্কে` : `About ${settings.store_name}`}
           </h1>
           <p className="mt-3 text-sm text-slate-300 max-w-xl">
-            {settings.store_tagline || 'Committed to delivering excellence, quality products, and exceptional customer service across Bangladesh.'}
+            {settings.store_tagline || (isBangla ? 'সারা বাংলাদেশে সেরা মানের পণ্য ও উন্নত কাস্টমার সেবা নিশ্চিত করতে আমরা প্রতিশ্রুতিবদ্ধ।' : 'Committed to delivering excellence, quality products, and exceptional customer service across Bangladesh.')}
           </p>
         </div>
       </section>
@@ -129,8 +132,8 @@ export default function AboutPageClient() {
                 <Store className="h-6 w-6" />
               </div>
               <div>
-                <h2 className="text-lg font-black text-slate-950">Our Story & Mission</h2>
-                <p className="text-xs text-slate-500">Dedicated to delivering high-quality products to your doorstep</p>
+                <h2 className="text-lg font-black text-slate-950">{t('about.story_mission')}</h2>
+                <p className="text-xs text-slate-500">{isBangla ? 'আপনার দোরগোড়ায় প্রিমিয়াম পণ্য পৌঁছে দিতে আমরা নিবেদিত' : 'Dedicated to delivering high-quality products to your doorstep'}</p>
               </div>
             </div>
             
@@ -146,9 +149,9 @@ export default function AboutPageClient() {
             <div className="rounded-xl bg-brand-50 w-12 h-12 flex items-center justify-center text-brand-600 font-bold">
               <ShieldCheck className="h-6 w-6" />
             </div>
-            <h3 className="text-sm font-bold text-slate-900">Uncompromising Quality</h3>
+            <h3 className="text-sm font-bold text-slate-900">{t('about.quality')}</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              We carefully inspect every item before dispatch to ensure it meets the highest standards of reliability and durability.
+              {t('about.quality_desc')}
             </p>
           </div>
 
@@ -156,9 +159,9 @@ export default function AboutPageClient() {
             <div className="rounded-xl bg-brand-50 w-12 h-12 flex items-center justify-center text-brand-600 font-bold">
               <Truck className="h-6 w-6" />
             </div>
-            <h3 className="text-sm font-bold text-slate-900">Reliable Nationwide Courier</h3>
+            <h3 className="text-sm font-bold text-slate-900">{t('about.delivery_nationwide')}</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Fast, insured doorstep deliveries across all 64 districts in Bangladesh with live parcel tracking.
+              {t('about.delivery_desc')}
             </p>
           </div>
 
@@ -166,9 +169,9 @@ export default function AboutPageClient() {
             <div className="rounded-xl bg-brand-50 w-12 h-12 flex items-center justify-center text-brand-600 font-bold">
               <HeartHandshake className="h-6 w-6" />
             </div>
-            <h3 className="text-sm font-bold text-slate-900">Customer First Support</h3>
+            <h3 className="text-sm font-bold text-slate-900">{t('about.support')}</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Our responsive customer service is always here to assist with product guidance, order tracking, and after-sales support.
+              {t('about.support_desc')}
             </p>
           </div>
         </div>
@@ -178,14 +181,14 @@ export default function AboutPageClient() {
           <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm space-y-6">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div>
-                <h2 className="text-lg font-bold text-slate-950">Visit Our Location & Reach Us</h2>
-                <p className="text-xs text-slate-500 mt-0.5">We welcome visits, inquiries, and customer consultations.</p>
+                <h2 className="text-lg font-bold text-slate-950">{t('about.visit_us')}</h2>
+                <p className="text-xs text-slate-500 mt-0.5">{isBangla ? 'আমরা যে কোনো পরামর্শ ও প্রশ্নের জন্য সবসময় প্রস্তুত।' : 'We welcome visits, inquiries, and customer consultations.'}</p>
               </div>
               <Link
                 href="/contact"
                 className="hidden sm:flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-brand-500 transition"
               >
-                <span>Contact Page</span>
+                <span>{t('nav.contact')}</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
@@ -196,7 +199,7 @@ export default function AboutPageClient() {
                   <div className="flex items-start gap-3">
                     <MapPin className="h-5 w-5 text-brand-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-bold text-slate-900">Store Address</p>
+                      <p className="font-bold text-slate-900">{isBangla ? 'দোকানের ঠিকানা' : 'Store Address'}</p>
                       <p className="text-slate-600 mt-0.5 leading-relaxed">{settings.contact_address}</p>
                     </div>
                   </div>
@@ -206,7 +209,7 @@ export default function AboutPageClient() {
                   <div className="flex items-start gap-3">
                     <Phone className="h-5 w-5 text-brand-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-bold text-slate-900">Phone Support</p>
+                      <p className="font-bold text-slate-900">{isBangla ? 'ফোন সহায়তা' : 'Phone Support'}</p>
                       <a href={`tel:${settings.contact_phone.replace(/\s+/g, '')}`} className="text-slate-600 hover:text-brand-600 transition mt-0.5 block">
                         {settings.contact_phone}
                       </a>
@@ -218,7 +221,7 @@ export default function AboutPageClient() {
                   <div className="flex items-start gap-3">
                     <MessageCircle className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-bold text-slate-900">WhatsApp Chat</p>
+                      <p className="font-bold text-slate-900">{isBangla ? 'হোয়াটসঅ্যাপ চ্যাট' : 'WhatsApp Chat'}</p>
                       <a 
                         href={getWhatsAppUrl(settings.contact_whatsapp, settings.store_name)}
                         target="_blank"
@@ -226,7 +229,7 @@ export default function AboutPageClient() {
                         className="text-emerald-700 font-bold hover:underline mt-0.5 inline-flex items-center gap-1"
                       >
                         <span>{settings.contact_whatsapp}</span>
-                        <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded font-semibold">Message Now</span>
+                        <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded font-semibold">{isBangla ? 'মেসেজ দিন' : 'Message Now'}</span>
                       </a>
                     </div>
                   </div>
@@ -236,7 +239,7 @@ export default function AboutPageClient() {
                   <div className="flex items-start gap-3">
                     <Mail className="h-5 w-5 text-brand-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-bold text-slate-900">Email</p>
+                      <p className="font-bold text-slate-900">{isBangla ? 'ইমেইল' : 'Email'}</p>
                       <a href={`mailto:${settings.contact_email}`} className="text-slate-600 hover:text-brand-600 transition mt-0.5 block">
                         {settings.contact_email}
                       </a>
@@ -248,7 +251,7 @@ export default function AboutPageClient() {
                 {socialLinks.length > 0 && (
                   <div className="pt-3 border-t border-slate-100 space-y-2">
                     <p className="font-bold text-slate-900 flex items-center gap-1.5">
-                      <Share2 className="h-3.5 w-3.5 text-brand-600" /> Connect on Social Media
+                      <Share2 className="h-3.5 w-3.5 text-brand-600" /> {isBangla ? 'সোশ্যাল মিডিয়ায় যুক্ত হোন' : 'Connect on Social Media'}
                     </p>
                     <div className="flex flex-wrap gap-2 pt-1">
                       {socialLinks.map((s) => (

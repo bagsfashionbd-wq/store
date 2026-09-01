@@ -14,12 +14,33 @@ export interface StaffMember {
 }
 
 /**
+ * Normalizes role string to standard StaffRole enum
+ */
+export function normalizeStaffRole(role?: string | null): StaffRole {
+  if (!role) return 'staff'
+  const r = role.toLowerCase().trim().replace(/[-\s]/g, '_')
+  if (r === 'admin' || r === 'administrator') return 'admin'
+  if (
+    r === 'shop_owner' ||
+    r === 'shopowner' ||
+    r === 'store_owner' ||
+    r === 'storeowner' ||
+    r === 'owner' ||
+    r === 'shop_admin' ||
+    r === 'store_admin'
+  ) {
+    return 'shop_owner'
+  }
+  return 'staff'
+}
+
+/**
  * Checks if role has full administrative & management access
  */
 export function hasFullAccess(role?: string | null): boolean {
   if (!role) return false
-  const r = role.toLowerCase().trim()
-  return r === 'admin' || r === 'shop_owner' || r === 'shopowner' || r === 'owner'
+  const r = normalizeStaffRole(role)
+  return r === 'admin' || r === 'shop_owner'
 }
 
 /**
@@ -47,7 +68,7 @@ export function canAccessStats(role?: string | null): boolean {
  * Get human-friendly label and styling for roles
  */
 export function getRoleDetails(role: string): { label: string; bg: string; text: string; border: string; desc: string } {
-  const r = role.toLowerCase().trim()
+  const r = normalizeStaffRole(role)
   if (r === 'admin') {
     return {
       label: 'Admin',
@@ -57,7 +78,7 @@ export function getRoleDetails(role: string): { label: string; bg: string; text:
       desc: 'Full access to all store modules, settings, and staff'
     }
   }
-  if (r === 'shop_owner' || r === 'shopowner' || r === 'owner') {
+  if (r === 'shop_owner') {
     return {
       label: 'Shop Owner',
       bg: 'bg-emerald-50',

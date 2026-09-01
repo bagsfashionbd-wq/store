@@ -4,6 +4,7 @@ import React from 'react'
 import Link from 'next/link'
 import { X, Plus, Minus, Trash2, ShoppingBag } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
+import { useLanguage } from '@/context/LanguageContext'
 
 interface CartDrawerProps {
   isOpen: boolean
@@ -12,8 +13,11 @@ interface CartDrawerProps {
 
 export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const { cartItems, updateQuantity, removeFromCart, cartTotal } = useCart()
+  const { t, toBengaliDigits, isBangla } = useLanguage()
 
   if (!isOpen) return null
+
+  const totalQuantity = cartItems.reduce((s, i) => s + i.quantity, 0)
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
@@ -31,7 +35,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               {/* HEADER */}
               <div className="flex items-center justify-between border-b border-slate-200 px-4 py-6 sm:px-6">
                 <h2 className="text-base font-bold text-slate-900" id="slide-over-title">
-                  Shopping Cart ({cartItems.reduce((s, i) => s + i.quantity, 0)})
+                  {t('cart.shopping_cart')} ({isBangla ? toBengaliDigits(totalQuantity) : totalQuantity})
                 </h2>
                 <button
                   onClick={onClose}
@@ -48,13 +52,13 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                     <div className="rounded-full bg-slate-100 p-6 text-slate-400 mb-4">
                       <ShoppingBag className="h-10 w-10" />
                     </div>
-                    <p className="text-base font-bold text-slate-900">Your cart is empty</p>
-                    <p className="mt-1 text-xs text-slate-500">Explore products to get started.</p>
+                    <p className="text-base font-bold text-slate-900">{t('cart.empty_cart')}</p>
+                    <p className="mt-1 text-xs text-slate-500">{t('cart.empty_subtitle')}</p>
                     <button
                       onClick={onClose}
                       className="mt-6 rounded-lg bg-brand-600 px-5 py-2.5 text-xs font-bold text-white shadow hover:bg-brand-500 transition"
                     >
-                      Continue Shopping
+                      {t('cart.start_shopping')}
                     </button>
                   </div>
                 ) : (
@@ -105,7 +109,9 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                               >
                                 <Minus className="h-3 w-3" />
                               </button>
-                              <span className="px-2 text-xs text-slate-900 font-bold">{item.quantity}</span>
+                              <span className="px-2 text-xs text-slate-900 font-bold">
+                                {isBangla ? toBengaliDigits(item.quantity) : item.quantity}
+                              </span>
                               <button
                                 onClick={() => updateQuantity(item.id, item.selectedVariations, item.quantity + 1)}
                                 className="px-2 py-0.5 hover:bg-slate-100 rounded-r-lg transition text-slate-600 font-bold"
@@ -118,7 +124,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                             <button
                               onClick={() => removeFromCart(item.id, item.selectedVariations)}
                               className="text-slate-400 hover:text-red-600 p-1 transition-colors"
-                              title="Remove item"
+                              title={t('cart.remove_item')}
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -134,11 +140,13 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               {cartItems.length > 0 && (
                 <div className="border-t border-slate-200 px-4 py-6 sm:px-6 bg-slate-50">
                   <div className="flex justify-between text-sm font-bold text-slate-900">
-                    <p>Subtotal</p>
+                    <p>{t('cart.subtotal')}</p>
                     <p className="text-base font-black">৳{cartTotal.toLocaleString()}</p>
                   </div>
                   <p className="mt-1 text-[11px] text-slate-500">
-                    Shipping is calculated at checkout based on delivery location.
+                    {isBangla 
+                      ? 'ডেলিভারি লোকেশন অনুযায়ী চেকআউটে ডেলিভারি চার্জ হিসাব করা হবে।'
+                      : 'Shipping is calculated at checkout based on delivery location.'}
                   </p>
                   <div className="mt-4">
                     <Link
@@ -146,7 +154,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       onClick={onClose}
                       className="flex items-center justify-center rounded-xl bg-brand-600 px-6 py-3 text-sm font-bold text-white shadow-lg hover:bg-brand-500 transition-all"
                     >
-                      Proceed to Checkout
+                      {t('cart.proceed_to_checkout')}
                     </Link>
                   </div>
                 </div>
