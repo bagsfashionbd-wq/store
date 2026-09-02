@@ -260,6 +260,31 @@ export const en = {
     stock_valuation: 'Stock Valuation',
     inventory_health: 'Inventory Health',
     save_settings: 'Save Settings',
-    logged_in_as: 'Logged in as'
+    logged_in_as: 'Logged in as',
+    promotions: 'Promotions & Campaigns',
+    coupons: 'Promo Codes'
+  },
+  promotions: {
+    title: 'Promotions & Campaigns',
+    banner: 'Pop-up Banner',
+    ribbon: 'Header Ribbon',
+    active: 'Active',
+    scheduled: 'Scheduled',
+    expired: 'Expired',
+    promo_code: 'Promo Code',
+    discount: 'Discount',
+    usage: 'Usage',
+    valid_until: 'Valid Until'
+  },
+  account: {
+    my_account: 'My Account',
+    my_orders: 'My Orders',
+    wishlist: 'Saved Wishlist',
+    profile: 'Profile Details',
+    password: 'Change Password',
+    sign_in: 'Sign In',
+    sign_up: 'Create Account',
+    logout: 'Sign Out',
+    save_changes: 'Save Changes'
   }
 }

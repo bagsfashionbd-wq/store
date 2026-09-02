@@ -113,11 +113,12 @@ export async function updateSession(request: NextRequest) {
     }
 
     // Role-Based Route Protection:
-    // 'staff' role cannot access /stradmn/stats, /stradmn/settings, or /stradmn/staff
+    // 'staff' role cannot access /stradmn/stats, /stradmn/settings, /stradmn/staff, or /stradmn/promotions
     const isRestrictedForStaff = (
       pathname.startsWith('/stradmn/stats') ||
       pathname.startsWith('/stradmn/settings') ||
-      pathname.startsWith('/stradmn/staff')
+      pathname.startsWith('/stradmn/staff') ||
+      pathname.startsWith('/stradmn/promotions')
     )
 
     if (userRole === 'staff' && isRestrictedForStaff) {

@@ -257,6 +257,12 @@ export default async function InvoicePage({ params }: InvoicePageProps) {
               <span>Items Subtotal:</span>
               <span>৳{subtotal.toLocaleString()}</span>
             </div>
+            {Number(order.discount_amount) > 0 && (
+              <div className="flex justify-between text-emerald-600 print:text-black font-bold">
+                <span>Discount {order.promo_code ? `(${order.promo_code})` : ''}:</span>
+                <span>-৳{Number(order.discount_amount).toLocaleString()}</span>
+              </div>
+            )}
             <div className="flex justify-between text-slate-600 print:text-black font-bold">
               <span>Delivery Fee ({
                 order.shipping_provider === 'steadfast' 
@@ -277,7 +283,9 @@ export default async function InvoicePage({ params }: InvoicePageProps) {
               {isFullyPaid && (
                 <div className="bg-emerald-50 p-2.5 rounded-lg border border-emerald-200 text-emerald-800 space-y-1 print-clean">
                   <div className="flex justify-between font-semibold print:text-black">
-                    <span>Paid Online via bKash:</span>
+                    <span>
+                      {order.payment_method === 'BKASH_PERSONAL' ? 'bKash Personal (Verified):' : 'Paid Online via bKash:'}
+                    </span>
                     <span>৳{Number(order.total_price).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between font-black text-emerald-900 border-t border-emerald-200/60 pt-1 print-clean print:border-black">
@@ -300,14 +308,34 @@ export default async function InvoicePage({ params }: InvoicePageProps) {
                 </div>
               )}
 
-              {!isFullyPaid && !isPartialAdvance && (
+              {!isFullyPaid && !isPartialAdvance && order.payment_status === 'Pending Verification' && (
+                <div className="bg-pink-50 p-2.5 rounded-lg border border-pink-200 text-pink-900 space-y-1 print-clean">
+                  <div className="flex justify-between text-[11px] font-bold print:text-black">
+                    <span>bKash Personal Payment:</span>
+                    <span className="text-pink-700 uppercase">(Pending Verification)</span>
+                  </div>
+                  {order.payment_method === 'COD' ? (
+                    <div className="flex justify-between font-black text-slate-900 text-xs border-t border-pink-200 pt-1 print:border-black print:text-black">
+                      <span>COD Balance (upon verification):</span>
+                      <span>৳{Math.max(0, Number(order.total_price) - Number(order.delivery_charge)).toLocaleString()}</span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between font-black text-slate-900 text-xs border-t border-pink-200 pt-1 print:border-black print:text-black">
+                      <span>Amount Pending Verification:</span>
+                      <span>৳{Number(order.total_price).toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!isFullyPaid && !isPartialAdvance && order.payment_status !== 'Pending Verification' && (
                 <div className="bg-amber-50/70 p-2.5 rounded-lg border border-amber-200 text-amber-900 space-y-1 print-clean">
                   <div className="flex justify-between text-[11px] text-amber-700 font-semibold print:text-black">
-                    <span>Advance Payment Status:</span>
+                    <span>Payment Status:</span>
                     <span className="font-bold uppercase text-red-600 print:text-black">{order.payment_status === 'Failed' ? 'Failed / Unpaid' : 'Pending'}</span>
                   </div>
                   <div className="flex justify-between font-black text-amber-950 text-xs border-t border-amber-200 pt-1 print:border-black print:text-black">
-                    <span>Total Due on Delivery (Products + Shipping):</span>
+                    <span>Total Due on Delivery:</span>
                     <span>৳{dueOnDelivery.toLocaleString()}</span>
                   </div>
                 </div>

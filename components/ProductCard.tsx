@@ -2,8 +2,9 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { ShoppingBag, Eye, X, Check, ArrowRight } from 'lucide-react'
+import { ShoppingBag, Eye, X, Check, ArrowRight, Heart } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
+import { useCustomer } from '@/context/CustomerContext'
 import { useLanguage } from '@/context/LanguageContext'
 
 export interface VariationValue {
@@ -90,10 +91,24 @@ interface ProductCardProps {
 
 export default function ProductCard({ product, categories = [], onAddToCartSuccess }: ProductCardProps) {
   const { addToCart } = useCart()
+  const { toggleWishlist, isInWishlist } = useCustomer()
   const { t, toBengaliDigits, isBangla } = useLanguage()
   const [showVariantModal, setShowVariantModal] = useState(false)
   const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({})
+  const [guestToast, setGuestToast] = useState(false)
   const modalRef = useRef<HTMLDivElement>(null)
+
+  const isFavorited = isInWishlist(product.id)
+
+  const handleWishlistClick = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const res = await toggleWishlist(product.id)
+    if (res.isGuest && res.added) {
+      setGuestToast(true)
+      setTimeout(() => setGuestToast(false), 3500)
+    }
+  }
 
   const parsedOptions = extractProductOptions(product.variations, product.stock)
   const hasOptions = parsedOptions.length > 0
@@ -210,6 +225,24 @@ export default function ProductCard({ product, categories = [], onAddToCartSucce
             <span className="bg-white/95 text-slate-900 font-black text-[10px] sm:text-xs px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full uppercase tracking-wider shadow">
               {t('product.out_of_stock')}
             </span>
+          </div>
+        )}
+
+        {/* Wishlist Heart Button */}
+        <button
+          type="button"
+          onClick={handleWishlistClick}
+          className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-white/90 backdrop-blur-sm text-slate-500 hover:text-pink-600 hover:bg-white transition shadow-md"
+          aria-label="Save to wishlist"
+          title={isFavorited ? 'Remove from wishlist' : 'Add to wishlist'}
+        >
+          <Heart className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${isFavorited ? 'fill-pink-600 text-pink-600' : ''}`} />
+        </button>
+
+        {/* Guest Wishlist Reminder Toast */}
+        {guestToast && (
+          <div className="absolute inset-x-2 bottom-2 z-20 rounded-xl bg-slate-900/90 text-white p-2 text-[10px] font-bold text-center backdrop-blur-sm animate-in fade-in">
+            {isBangla ? 'পছন্দের তালিকায় যুক্ত হয়েছে! স্থায়ীভাবে রাখতে লগইন করুন।' : 'Saved to wishlist! Sign in to save permanently.'}
           </div>
         )}
       </Link>
