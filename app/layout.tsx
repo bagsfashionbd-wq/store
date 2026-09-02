@@ -4,8 +4,12 @@ import '@/app/globals.css'
 import { CartProvider } from '@/context/CartContext'
 import { StoreProvider } from '@/context/StoreContext'
 import { LanguageProvider } from '@/context/LanguageContext'
+import { CustomerProvider } from '@/context/CustomerContext'
 import ThemeProvider from '@/components/ThemeProvider'
 import TrackingScripts from '@/components/TrackingScripts'
+import PromoRibbon from '@/components/PromoRibbon'
+import PromoBanner from '@/components/PromoBanner'
+import AuthModal from '@/components/AuthModal'
 import { getPublicSettings } from '@/utils/settings'
 import { createAdminClient } from '@/utils/supabase/server'
 
@@ -34,11 +38,24 @@ export default async function RootLayout({
   const settings = await getPublicSettings()
   const supabase = createAdminClient()
 
-  // Fetch categories for context
-  const { data: categories } = await supabase
-    .from('categories')
-    .select('*')
-    .order('name', { ascending: true })
+  // Fetch categories & active promotions in parallel
+  const [categoriesRes, promotionsRes] = await Promise.all([
+    supabase
+      .from('categories')
+      .select('*')
+      .order('name', { ascending: true }),
+    supabase
+      .from('promotions')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+  ])
+
+  const categories = categoriesRes.data || []
+  const promotions = promotionsRes.data || []
+
+  const activeRibbon = promotions.find((p) => p.type === 'ribbon') || null
+  const activeBanner = promotions.find((p) => p.type === 'banner') || null
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -49,10 +66,15 @@ export default async function RootLayout({
         <TrackingScripts settings={settings} />
         <LanguageProvider>
           <ThemeProvider themeColor={settings.theme_color}>
-            <StoreProvider initialSettings={settings} initialCategories={categories || []}>
-              <CartProvider>
-                {children}
-              </CartProvider>
+            <StoreProvider initialSettings={settings} initialCategories={categories}>
+              <CustomerProvider>
+                <CartProvider>
+                  <PromoRibbon ribbon={activeRibbon} />
+                  <PromoBanner banner={activeBanner} />
+                  <AuthModal />
+                  {children}
+                </CartProvider>
+              </CustomerProvider>
             </StoreProvider>
           </ThemeProvider>
         </LanguageProvider>
@@ -60,3 +82,4 @@ export default async function RootLayout({
     </html>
   )
 }
+

@@ -2,10 +2,11 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
-import { ShoppingBag, Menu, X, ChevronDown, ChevronRight, ShieldCheck, ArrowRight } from 'lucide-react'
+import { ShoppingBag, Menu, X, ChevronDown, ChevronRight, ShieldCheck, ArrowRight, Heart, User, Search } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useStore } from '@/context/StoreContext'
 import { useLanguage } from '@/context/LanguageContext'
+import { useCustomer } from '@/context/CustomerContext'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 interface NavbarProps {
@@ -15,8 +16,10 @@ interface NavbarProps {
 export default function Navbar({ onCartToggle }: NavbarProps) {
   const { cartCount } = useCart()
   const { settings, categories, isAdmin } = useStore()
+  const { customer, isLoggedIn, wishlistCount, openAuthModal, customerLogout } = useCustomer()
   const { t, toBengaliDigits, isBangla } = useLanguage()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [mobileCategoriesExpanded, setMobileCategoriesExpanded] = useState(false)
   const [expandedMobileParent, setExpandedMobileParent] = useState<string | null>(null)
 
@@ -168,57 +171,200 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
                   <span>{t('nav.best_seller')}</span>
                 </Link>
               )}
-
-              {settings.about_enabled && (settings.about_story || settings.contact_address || settings.contact_phone || settings.contact_whatsapp || settings.contact_email) && (
-                <Link
-                  href="/about"
-                  className="text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-brand-600 px-3 py-2 rounded-md hover:bg-slate-50 transition-colors"
-                >
-                  {t('nav.about_us')}
-                </Link>
-              )}
             </nav>
           </div>
 
-          {/* Action Icons: Language Switcher, Track Order & Cart with Label */}
-          <div className="flex items-center gap-2 sm:gap-2.5">
-            {/* Language Switcher */}
+          {/* Action Icons: Language Switcher, Track Order, Search (Mobile), Profile, Cart, Menu */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Language Switcher (Desktop) */}
             <LanguageSwitcher size="sm" className="hidden sm:inline-flex" />
 
-            {/* Track Order beside Cart */}
+            {/* Track Order beside Cart (Desktop) */}
             <Link
               href="/track"
-              className="hidden sm:inline-flex items-center text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-brand-600 px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors shadow-sm"
+              className="hidden sm:inline-flex items-center text-xs font-bold text-slate-700 hover:text-brand-600 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors shadow-sm"
             >
               {t('nav.track_order')}
             </Link>
 
-            {/* Cart Button with Icon & Label */}
+            {/* Wishlist Button (Desktop) */}
+            <Link
+              href="/account?tab=wishlist"
+              className="relative hidden sm:inline-flex items-center justify-center h-10 w-10 rounded-xl border border-slate-200 hover:border-pink-300 hover:bg-pink-50 text-slate-700 hover:text-pink-600 transition shadow-sm"
+              title="Wishlist"
+              aria-label="Wishlist"
+            >
+              <Heart className="h-4 w-4" />
+              {wishlistCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-pink-600 text-[9px] font-black text-white">
+                  {wishlistCount}
+                </span>
+              )}
+            </Link>
+
+            {/* 1. Mobile Search Icon Button (Mobile Only) */}
+            <button
+              type="button"
+              onClick={() => {
+                setMobileSearchOpen(!mobileSearchOpen)
+                if (mobileMenuOpen) setMobileMenuOpen(false)
+              }}
+              className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl text-slate-700 hover:bg-slate-100 lg:hidden border border-slate-200"
+              aria-label="Search"
+              title="Search"
+            >
+              <Search className="h-4 w-4 text-slate-700" />
+            </button>
+
+            {/* 2. User Account Button / Dropdown (Icon-only on mobile, full label on desktop) */}
+            <div className="relative group">
+              {isLoggedIn ? (
+                <Link
+                  href="/account"
+                  className="flex items-center justify-center gap-1.5 h-9 w-9 sm:h-auto sm:w-auto px-0 sm:px-3 py-0 sm:py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold transition shadow-sm"
+                  title="My Account"
+                  aria-label="My Account"
+                >
+                  <User className="h-4 w-4 text-brand-600" />
+                  <span className="max-w-[80px] truncate hidden md:inline-block">
+                    {customer?.full_name?.split(' ')[0] || 'Account'}
+                  </span>
+                  <ChevronDown className="h-3 w-3 text-slate-400 group-hover:rotate-180 transition-transform hidden sm:inline-block" />
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => openAuthModal('login')}
+                  className="flex items-center justify-center gap-1 h-9 w-9 sm:h-auto sm:w-auto px-0 sm:px-3 py-0 sm:py-2 rounded-xl border border-slate-200 hover:border-brand-500 hover:bg-brand-50 text-slate-700 hover:text-brand-700 text-xs font-bold transition shadow-sm"
+                  title="Sign In"
+                  aria-label="Sign In"
+                >
+                  <User className="h-4 w-4" />
+                  <span className="hidden md:inline-block">{isBangla ? 'লগইন' : 'Sign In'}</span>
+                </button>
+              )}
+
+              {/* Account Dropdown Menu (If Logged In) */}
+              {isLoggedIn && (
+                <div className="absolute right-0 top-full hidden group-hover:block w-48 pt-1.5 z-50 animate-fade-in-down">
+                  <div className="rounded-2xl border border-slate-200 bg-white/95 backdrop-blur-md p-2 shadow-xl space-y-1 text-xs">
+                    <div className="px-3 py-1.5 border-b border-slate-100 mb-1">
+                      <span className="font-bold text-slate-900 block truncate">{customer?.full_name}</span>
+                      <span className="text-[10px] text-slate-400 block truncate">{customer?.email}</span>
+                    </div>
+
+                    <Link
+                      href="/account?tab=orders"
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl font-semibold text-slate-700 hover:bg-slate-50 hover:text-brand-600 transition"
+                    >
+                      <ShoppingBag className="h-3.5 w-3.5" />
+                      <span>{isBangla ? 'আমার অর্ডারসমূহ' : 'My Orders'}</span>
+                    </Link>
+
+                    <Link
+                      href="/account?tab=wishlist"
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl font-semibold text-slate-700 hover:bg-slate-50 hover:text-brand-600 transition"
+                    >
+                      <Heart className="h-3.5 w-3.5" />
+                      <span>{isBangla ? 'উইশলিস্ট' : 'Wishlist'}</span>
+                    </Link>
+
+                    <Link
+                      href="/account?tab=profile"
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl font-semibold text-slate-700 hover:bg-slate-50 hover:text-brand-600 transition"
+                    >
+                      <User className="h-3.5 w-3.5" />
+                      <span>{isBangla ? 'প্রোফাইল' : 'Profile'}</span>
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={() => customerLogout()}
+                      className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-xl font-semibold text-rose-600 hover:bg-rose-50 transition"
+                    >
+                      <span>{isBangla ? 'লগআউট' : 'Sign Out'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 3. Cart Button (Icon only on Mobile, Label on Desktop) */}
             <button
               onClick={onCartToggle}
-              className="relative flex items-center gap-2 rounded-xl bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/30 text-brand-900 px-3.5 py-2 text-xs font-bold transition-all shadow-sm"
+              className="relative flex items-center justify-center gap-1.5 rounded-xl bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/30 text-brand-900 h-9 w-9 sm:h-auto sm:w-auto px-0 sm:px-3.5 py-0 sm:py-2 text-xs font-bold transition-all shadow-sm"
               id="cart-trigger"
               aria-label="Shopping Cart"
+              title="Cart"
             >
               <ShoppingBag className="h-4 w-4 text-brand-700" />
-              <span className="tracking-wide">{t('nav.cart')}</span>
+              <span className="tracking-wide hidden sm:inline">{t('nav.cart')}</span>
               {cartCount > 0 && (
-                <span className="flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full bg-brand-600 text-[10px] font-black text-white">
+                <span className="absolute -top-1 -right-1 sm:static sm:top-auto sm:right-auto flex h-4 min-w-[16px] sm:h-5 sm:min-w-[20px] px-1 sm:px-1.5 items-center justify-center rounded-full bg-brand-600 text-[9px] sm:text-[10px] font-black text-white">
                   {isBangla ? toBengaliDigits(cartCount) : cartCount}
                 </span>
               )}
             </button>
 
-            {/* Mobile Menu Button */}
+            {/* 4. Mobile Menu Button */}
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-700 hover:bg-slate-100 lg:hidden border border-slate-200"
+              onClick={() => {
+                setMobileMenuOpen(!mobileMenuOpen)
+                if (mobileSearchOpen) setMobileSearchOpen(false)
+              }}
+              className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl text-slate-700 hover:bg-slate-100 lg:hidden border border-slate-200"
               aria-label="Menu"
             >
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
           </div>
         </div>
+
+        {/* Mobile Search Bar Dropdown */}
+        {mobileSearchOpen && (
+          <div className="border-t border-slate-200 bg-white px-4 py-3 lg:hidden shadow-lg animate-fade-in-down">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const input = (e.currentTarget.elements.namedItem('mobileSearch') as HTMLInputElement)?.value
+                if (input) {
+                  const topInput = document.getElementById('top-product-search') as HTMLInputElement
+                  if (topInput) {
+                    topInput.value = input
+                    topInput.dispatchEvent(new Event('input', { bubbles: true }))
+                    topInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  } else {
+                    window.location.href = `/?search=${encodeURIComponent(input)}#catalog`
+                  }
+                }
+              }}
+              className="relative flex items-center"
+            >
+              <Search className="absolute left-3.5 h-4 w-4 text-brand-600/70 pointer-events-none" />
+              <input
+                type="text"
+                name="mobileSearch"
+                autoFocus
+                placeholder={isBangla ? 'পণ্য বা কালেকশন খুঁজুন...' : 'Search products...'}
+                className="w-full rounded-xl border-2 border-brand-500/50 bg-slate-50 py-2.5 pl-10 pr-9 text-xs font-medium text-slate-900 outline-none focus:border-brand-600 focus:bg-white"
+                onChange={(e) => {
+                  const topInput = document.getElementById('top-product-search') as HTMLInputElement
+                  if (topInput) {
+                    topInput.value = e.target.value
+                    topInput.dispatchEvent(new Event('input', { bubbles: true }))
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setMobileSearchOpen(false)}
+                className="absolute right-2.5 p-1 text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </form>
+          </div>
+        )}
 
         {/* Mobile Navigation Dropdown */}
         {mobileMenuOpen && (
@@ -362,20 +508,49 @@ export default function Navbar({ onCartToggle }: NavbarProps) {
               )}
 
               <div className="pt-2 border-t border-slate-100 space-y-1">
-                {settings.about_enabled && (settings.about_story || settings.contact_address || settings.contact_phone || settings.contact_whatsapp || settings.contact_email) && (
+                <Link
+                  href="/account?tab=wishlist"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50 hover:text-brand-600"
+                >
+                  <div className="flex items-center gap-2">
+                    <Heart className="h-4 w-4 text-pink-600" />
+                    <span>{isBangla ? 'উইশলিস্ট' : 'Wishlist'}</span>
+                  </div>
+                  {wishlistCount > 0 && (
+                    <span className="text-[10px] bg-pink-600 text-white font-bold px-2 py-0.5 rounded-full">
+                      {wishlistCount}
+                    </span>
+                  )}
+                </Link>
+
+                {isLoggedIn ? (
                   <Link
-                    href="/about"
+                    href="/account"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50 hover:text-brand-600"
+                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50 hover:text-brand-600"
                   >
-                    {t('nav.about_us')}
+                    <User className="h-4 w-4 text-brand-600" />
+                    <span>{isBangla ? 'আমার অ্যাকাউন্ট' : 'My Account'}</span>
                   </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false)
+                      openAuthModal('login')
+                    }}
+                    className="w-full text-left flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-brand-700 bg-brand-50"
+                  >
+                    <User className="h-4 w-4 text-brand-600" />
+                    <span>{isBangla ? 'লগইন / সাইন আপ' : 'Sign In / Register'}</span>
+                  </button>
                 )}
 
                 <Link
                   href="/track"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block rounded-lg px-3 py-2 text-sm font-bold text-brand-600 bg-brand-50"
+                  className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
                 >
                   {t('nav.track_order')}
                 </Link>

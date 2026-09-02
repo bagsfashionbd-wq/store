@@ -37,10 +37,21 @@ export function StoreProvider({
 
   useEffect(() => {
     // Check if user is logged in as staff/owner/admin for floating pill
-    async function checkAdmin() {
+    async function checkAdmin(userId?: string) {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
+        const uid = userId || (await supabase.auth.getUser()).data.user?.id
+        if (!uid) {
+          setIsAdmin(false)
+          return
+        }
+
+        const { data: staff } = await supabase
+          .from('staff_members')
+          .select('role, status')
+          .eq('user_id', uid)
+          .maybeSingle()
+
+        if (staff && staff.status !== 'inactive' && ['admin', 'shop_owner', 'staff'].includes(staff.role)) {
           setIsAdmin(true)
         } else {
           setIsAdmin(false)
@@ -55,7 +66,7 @@ export function StoreProvider({
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const user = session?.user
       if (user) {
-        setIsAdmin(true)
+        checkAdmin(user.id)
       } else {
         setIsAdmin(false)
       }

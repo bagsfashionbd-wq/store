@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
+import { useCustomer } from '@/context/CustomerContext'
 
 export interface CartItem {
   id: string
@@ -26,6 +27,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined)
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const { removeFromWishlist } = useCustomer()
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -45,6 +47,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [cartItems])
 
   const addToCart = (newItem: Omit<CartItem, 'quantity'>, quantity = 1) => {
+    // Automatically clear from wishlist when added to cart
+    if (newItem?.id) {
+      removeFromWishlist(newItem.id)
+    }
+
     setCartItems((prevItems) => {
       // Find if item with same ID and variations already exists
       const existingItemIndex = prevItems.findIndex(

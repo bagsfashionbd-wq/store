@@ -7,7 +7,7 @@ import {
   TrendingUp, Users, DollarSign, Package, CheckCircle2,
   AlertCircle, Clock, Truck, Search, LogOut, ArrowUpRight,
   RefreshCw, Play, Edit2, FileText, ChevronRight, MessageSquare, Trash2, Mail, Phone,
-  XCircle, Check, Minus, Plus, ArrowUpDown, ArrowUp, ArrowDown
+  XCircle, Check, Minus, Plus, ArrowUpDown, ArrowUp, ArrowDown, Copy, Smartphone, ShieldCheck, Loader2
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { useStore } from '@/context/StoreContext'
@@ -35,6 +35,9 @@ interface Order {
   area_id: number
   delivery_charge: number
   total_price: number
+  discount_amount?: number
+  promo_code?: string | null
+  promo_code_id?: string | null
   payment_method: string
   payment_status: string
   order_status?: string
@@ -86,6 +89,10 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
   const [searchQuery, setSearchQuery] = useState('')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
+  // Pagination States
+  const [pageSize, setPageSize] = useState<number>(20)
+  const [currentPage, setCurrentPage] = useState<number>(1)
+
   useEffect(() => {
     if (searchParams.get('tab') === 'messages') {
       setActiveTab('messages')
@@ -93,6 +100,10 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
       setActiveTab('orders')
     }
   }, [searchParams])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
 
   // Edit Order Modal States
   const [editingOrder, setEditingOrder] = useState<Order | null>(null)
@@ -107,6 +118,7 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
   const [editOrderStatus, setEditOrderStatus] = useState('Pending')
   const [editPaymentStatus, setEditPaymentStatus] = useState('Pending')
   const [editAdvancePaid, setEditAdvancePaid] = useState(0)
+  const [editDiscountAmount, setEditDiscountAmount] = useState(0)
   const [editItems, setEditItems] = useState<EditableItem[]>([])
   const [deletedItemIds, setDeletedItemIds] = useState<string[]>([])
 
@@ -125,6 +137,7 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
   // Delete Order Confirmation Modal State
   const [deleteConfirmOrder, setDeleteConfirmOrder] = useState<Order | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [emailingOrderId, setEmailingOrderId] = useState<string | null>(null)
 
   // Column Sorting State
   const [sortField, setSortField] = useState<'date' | 'customer' | 'status' | 'payment' | 'amount' | 'courier'>('date')
@@ -237,6 +250,7 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
           ? Number(order.delivery_charge)
           : 0
     setEditAdvancePaid(initialAdvance)
+    setEditDiscountAmount(Number(order.discount_amount || 0))
     setDeletedItemIds([])
 
     // Populate editable items
@@ -378,6 +392,107 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
       alert('Error updating order status')
     } finally {
       setActionLoading(null)
+    }
+  }
+
+  // Copy text helper
+  const [copiedText, setCopiedText] = useState<string | null>(null)
+  const handleCopyText = (text: string, label: string) => {
+    if (!text) return
+    navigator.clipboard.writeText(text)
+    setCopiedText(`${label}-${text}`)
+    setTimeout(() => setCopiedText(null), 2500)
+  }
+
+  // Quick Verify bKash Personal Payment & Confirm Order
+  const handleVerifyBkashPayment = async (order: Order, isVerified: boolean) => {
+    const isCod = order.payment_method === 'COD'
+    let newPaymentStatus: string
+    let advancePaid = 0
+
+    if (isVerified) {
+      if (isCod) {
+        newPaymentStatus = 'DeliveryChargePrePaid'
+        advancePaid = Number(order.payment_details?.advance_paid || order.delivery_charge)
+      } else {
+        newPaymentStatus = 'FullyPaid'
+        advancePaid = Number(order.total_price)
+      }
+    } else {
+      newPaymentStatus = 'Failed'
+      advancePaid = 0
+    }
+
+    const newOrderStatus = isVerified && (order.order_status === 'Pending' || !order.order_status)
+      ? 'Confirmed'
+      : order.order_status || 'Pending'
+
+    setActionLoading(order.id)
+    try {
+      const response = await fetch('/api/admin/orders', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: order.id,
+          customer_name: order.customer_name,
+          customer_phone: order.customer_phone,
+          customer_email: order.customer_email,
+          shipping_address: order.shipping_address,
+          payment_status: newPaymentStatus,
+          order_status: newOrderStatus,
+          advance_paid: advancePaid
+        })
+      })
+
+      const resJson = await response.json()
+      if (resJson.success) {
+        setOrders((prev) =>
+          prev.map((o) => (o.id === order.id ? (resJson.data || { ...o, payment_status: newPaymentStatus, order_status: newOrderStatus }) : o))
+        )
+
+        // Automatically trigger invoice email when payment is verified
+        if (isVerified && order.customer_email) {
+          fetch('/api/email/invoice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_id: order.id })
+          }).catch(console.error)
+        }
+      } else {
+        alert(resJson.error || 'Failed to update bKash payment status')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Error updating bKash payment status')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  // Manually trigger or resend invoice email
+  const handleSendInvoiceEmail = async (order: Order) => {
+    if (!order.customer_email) {
+      alert('No customer email address on file for this order.')
+      return
+    }
+
+    setEmailingOrderId(order.id)
+    try {
+      const res = await fetch('/api/email/invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: order.id })
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        alert(`Invoice email successfully sent to ${order.customer_email}!`)
+      } else {
+        alert(`Email sending issue: ${data.error || data.message || 'Unknown error'}`)
+      }
+    } catch (err: any) {
+      alert(`Failed to send email: ${err.message}`)
+    } finally {
+      setEmailingOrderId(null)
     }
   }
 
@@ -596,9 +711,14 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
 
   // Live Calculations in Edit Modal
   const modalSubtotal = editItems.reduce((sum, it) => sum + (it.price || 0) * (it.quantity || 1), 0)
-  const modalTotalPrice = modalSubtotal + editDeliveryCharge
+  const modalDiscount = Number(editDiscountAmount || editingOrder?.discount_amount || 0)
+  const modalTotalPrice = Math.max(0, modalSubtotal + editDeliveryCharge - modalDiscount)
   const modalAdvancePaid = editAdvancePaid
   const modalDueOnDelivery = Math.max(0, modalTotalPrice - editAdvancePaid)
+
+  // Pagination Calculations
+  const totalPages = Math.ceil(sortedOrders.length / pageSize) || 1
+  const paginatedOrders = sortedOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-slate-100 text-slate-800">
@@ -755,24 +875,38 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                 )}
 
                 {/* 1. MOBILE RESPONSIVE ORDER CARDS (Phone View) */}
-                <div className="block md:hidden divide-y divide-slate-100">
-                  {sortedOrders.length === 0 ? (
+                <div className="block md:hidden divide-y divide-slate-200">
+                  {paginatedOrders.length === 0 ? (
                     <div className="p-8 text-center text-slate-400 text-xs">
                       No orders found matching your search.
                     </div>
                   ) : (
-                    sortedOrders.map((order) => {
-                      const isCod = order.payment_method === 'COD'
-                      const codProductAmount = isCod ? Number(order.total_price) - Number(order.delivery_charge) : 0
+                    paginatedOrders.map((order, idx) => {
+                      const totalOrderPrice = Number(order.total_price || 0)
                       const provider = order.shipping_provider || 'pathao'
                       const hasConsignment = order.pathao_consignment_id || order.steadfast_consignment_id
                       const currentStatus = order.order_status || 'Pending'
                       const isDispatched = currentStatus === 'Shipped' || currentStatus === 'Delivered' || currentStatus === 'Completed' || order.pathao_status === 'dispatched' || hasConsignment
-                      const isFullyPaid = order.payment_status === 'FullyPaid' || (order.payment_details?.advance_paid !== undefined && Number(order.payment_details.advance_paid) >= Number(order.total_price) && Number(order.total_price) > 0)
-                      const isPartiallyPaid = !isFullyPaid && (order.payment_status === 'DeliveryChargePrePaid' || (order.payment_details?.advance_paid !== undefined && Number(order.payment_details.advance_paid) > 0))
+
+                      const isFullyPaid = order.payment_status === 'FullyPaid' || (order.payment_details?.advance_paid !== undefined && Number(order.payment_details.advance_paid) >= totalOrderPrice && totalOrderPrice > 0)
+                      const advancePaid = order.payment_details?.advance_paid !== undefined
+                        ? Number(order.payment_details.advance_paid)
+                        : isFullyPaid
+                          ? totalOrderPrice
+                          : (order.payment_status === 'DeliveryChargePrePaid')
+                            ? Number(order.delivery_charge || 0)
+                            : 0
+
+                      const dueAmount = isFullyPaid ? 0 : Math.max(0, totalOrderPrice - advancePaid)
+                      const isPartiallyPaid = !isFullyPaid && (order.payment_status === 'DeliveryChargePrePaid' || advancePaid > 0)
 
                       return (
-                        <div key={order.id} className="p-3.5 space-y-2.5 bg-white hover:bg-slate-50/50 transition">
+                        <div
+                          key={order.id}
+                          className={`p-3.5 sm:p-4 space-y-2.5 transition ${
+                            idx % 2 === 0 ? 'bg-white' : 'bg-brand-50/40'
+                          } hover:bg-brand-50/70`}
+                        >
                           {/* Row 1: ID, Date, Order Status Badge */}
                           <div className="flex items-center justify-between gap-2">
                             <div>
@@ -838,7 +972,7 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                             </div>
 
                             <div className="text-right space-y-0.5">
-                              <p className="text-sm font-black text-slate-950">৳{Number(order.total_price).toLocaleString()}</p>
+                              <p className="text-sm font-black text-slate-950">৳{totalOrderPrice.toLocaleString()}</p>
                               <div className="flex items-center justify-end gap-1">
                                 <span className={`inline-flex items-center rounded px-1.5 py-0.2 text-[9px] font-bold ${
                                   isFullyPaid
@@ -855,16 +989,144 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                                   {!isFullyPaid && !isPartiallyPaid && order.payment_status !== 'Failed' && 'Pending'}
                                 </span>
                                 <span className="text-[9px] font-mono text-slate-400 uppercase font-bold">
-                                  {order.payment_method}
+                                  {order.payment_method === 'BKASH_PERSONAL' ? 'bKash' : order.payment_method}
                                 </span>
                               </div>
-                              {isCod && (
+                              {dueAmount > 0 ? (
                                 <p className="text-[10px] text-amber-700 font-bold">
-                                  Due on Delivery: ৳{codProductAmount.toLocaleString()}
+                                  Due on Delivery: ৳{dueAmount.toLocaleString()}
                                 </p>
-                              )}
+                              ) : isFullyPaid ? (
+                                <p className="text-[10px] text-emerald-700 font-bold">
+                                  Fully Paid (৳0 Due)
+                                </p>
+                              ) : null}
                             </div>
                           </div>
+
+                          {/* bKash Personal Verification Card (Mobile) */}
+                          {(order.payment_method === 'BKASH_PERSONAL' || order.payment_details?.transaction_id || order.payment_details?.sender_number) && (
+                            <div className="p-2.5 rounded-xl bg-pink-50 border border-pink-200 text-xs space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="inline-flex items-center gap-1 font-bold text-pink-700 text-[11px]">
+                                  <Smartphone className="h-3.5 w-3.5" />
+                                  <span>bKash Personal Payment</span>
+                                </span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  order.payment_status === 'DeliveryChargePrePaid' || order.payment_status === 'FullyPaid' || order.payment_details?.verified
+                                    ? 'bg-emerald-100 text-emerald-800' 
+                                    : order.payment_status === 'Failed'
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-pink-100 text-pink-800'
+                                }`}>
+                                  {order.payment_status === 'DeliveryChargePrePaid' || (isPartiallyPaid && order.payment_details?.verified)
+                                    ? (advancePaid > 0 ? `✓ Advance Verified (৳${advancePaid.toLocaleString()})` : '✓ Advance Verified')
+                                    : order.payment_status === 'FullyPaid' || order.payment_details?.verified
+                                    ? '✓ Verified (Paid)'
+                                    : order.payment_status === 'Failed'
+                                    ? 'Failed / Not Received'
+                                    : 'Pending Verification'}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                                {order.payment_details?.sender_number && (
+                                  <div className="bg-white p-1.5 rounded-lg border border-pink-100 flex items-center justify-between">
+                                    <div>
+                                      <span className="text-[9px] text-slate-400 font-sans block">Sender:</span>
+                                      <span className="font-bold text-slate-900">{order.payment_details.sender_number}</span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyText(order.payment_details.sender_number, 'sender')}
+                                      className="p-1 text-slate-400 hover:text-pink-600"
+                                      title="Copy sender number"
+                                    >
+                                      {copiedText === `sender-${order.payment_details.sender_number}` ? (
+                                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="h-3.5 w-3.5" />
+                                      )}
+                                    </button>
+                                  </div>
+                                )}
+
+                                {order.payment_details?.transaction_id && (
+                                  <div className="bg-white p-1.5 rounded-lg border border-pink-100 flex items-center justify-between">
+                                    <div>
+                                      <span className="text-[9px] text-slate-400 font-sans block">TrxID:</span>
+                                      <span className="font-bold text-pink-700 uppercase">{order.payment_details.transaction_id}</span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyText(order.payment_details.transaction_id, 'trx')}
+                                      className="p-1 text-slate-400 hover:text-pink-600"
+                                      title="Copy TrxID"
+                                    >
+                                      {copiedText === `trx-${order.payment_details.transaction_id}` ? (
+                                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="h-3.5 w-3.5" />
+                                      )}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="pt-1">
+                                {order.payment_status === 'Failed' ? (
+                                  <div className="flex items-center justify-between bg-white p-1.5 rounded-lg border border-red-200">
+                                    <span className="text-[10px] text-red-700 font-bold">Payment Rejected</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleVerifyBkashPayment(order, true)}
+                                      disabled={actionLoading === order.id}
+                                      className="text-[10px] text-pink-600 font-bold hover:underline"
+                                    >
+                                      Re-verify
+                                    </button>
+                                  </div>
+                                ) : (order.payment_status === 'DeliveryChargePrePaid' || order.payment_status === 'FullyPaid' || order.payment_details?.verified) ? (
+                                  <div className="flex items-center justify-between bg-white p-1.5 rounded-lg border border-emerald-200 text-emerald-700 text-[10px] font-bold">
+                                    <span className="flex items-center gap-1">
+                                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                      <span>{isPartiallyPaid ? (advancePaid > 0 ? `Advance Verified (৳${advancePaid.toLocaleString()})` : 'Advance Verified') : 'Full Payment Verified'}</span>
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleVerifyBkashPayment(order, false)}
+                                      disabled={actionLoading === order.id}
+                                      className="text-slate-400 hover:text-red-600 ml-1 font-normal text-[9px]"
+                                      title="Cancel verification"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleVerifyBkashPayment(order, true)}
+                                      disabled={actionLoading === order.id}
+                                      className="flex-1 py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-sm flex items-center justify-center gap-1 transition"
+                                    >
+                                      <Check className="h-3.5 w-3.5" />
+                                      <span>Verify Payment</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleVerifyBkashPayment(order, false)}
+                                      disabled={actionLoading === order.id}
+                                      className="py-1.5 px-2.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[11px] border border-red-200 flex items-center justify-center gap-1 transition"
+                                    >
+                                      <XCircle className="h-3.5 w-3.5" />
+                                      <span>Invalid</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
 
                           {/* Row 4: Courier Booking Status */}
                           {hasConsignment ? (
@@ -972,6 +1234,20 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                                 <FileText className="h-3.5 w-3.5" />
                                 <span>Invoice</span>
                               </a>
+                              {/* {order.customer_email && (
+                                <button
+                                  onClick={() => handleSendInvoiceEmail(order)}
+                                  disabled={emailingOrderId === order.id}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-semibold shadow-sm hover:bg-slate-50"
+                                  title={`Send Invoice Email to ${order.customer_email}`}
+                                >
+                                  {emailingOrderId === order.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-600" />
+                                  ) : (
+                                    <Mail className="h-3.5 w-3.5 text-slate-500" />
+                                  )}
+                                </button>
+                              )} */}
                               <button
                                 onClick={() => setDeleteConfirmOrder(order)}
                                 className="p-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 shadow-sm"
@@ -1074,26 +1350,34 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {sortedOrders.length === 0 ? (
+                      {paginatedOrders.length === 0 ? (
                         <tr>
                           <td colSpan={8} className="p-8 text-center text-slate-400">
                             No orders found matching your search.
                           </td>
                         </tr>
                       ) : (
-                        sortedOrders.map((order) => {
-                          const isCod = order.payment_method === 'COD'
-                          const codProductAmount = isCod ? Number(order.total_price) - Number(order.delivery_charge) : 0
+                        paginatedOrders.map((order, idx) => {
+                          const totalOrderPrice = Number(order.total_price || 0)
                           const provider = order.shipping_provider || 'pathao'
                           const hasConsignment = order.pathao_consignment_id || order.steadfast_consignment_id
                           const currentStatus = order.order_status || 'Pending'
                           const isDispatched = currentStatus === 'Shipped' || currentStatus === 'Delivered' || currentStatus === 'Completed' || order.pathao_status === 'dispatched' || hasConsignment
 
-                          const isFullyPaid = order.payment_status === 'FullyPaid' || (order.payment_details?.advance_paid !== undefined && Number(order.payment_details.advance_paid) >= Number(order.total_price) && Number(order.total_price) > 0)
-                          const isPartiallyPaid = !isFullyPaid && (order.payment_status === 'DeliveryChargePrePaid' || (order.payment_details?.advance_paid !== undefined && Number(order.payment_details.advance_paid) > 0))
+                          const isFullyPaid = order.payment_status === 'FullyPaid' || (order.payment_details?.advance_paid !== undefined && Number(order.payment_details.advance_paid) >= totalOrderPrice && totalOrderPrice > 0)
+                          const advancePaid = order.payment_details?.advance_paid !== undefined
+                            ? Number(order.payment_details.advance_paid)
+                            : isFullyPaid
+                              ? totalOrderPrice
+                              : (order.payment_status === 'DeliveryChargePrePaid')
+                                ? Number(order.delivery_charge || 0)
+                                : 0
+
+                          const dueAmount = isFullyPaid ? 0 : Math.max(0, totalOrderPrice - advancePaid)
+                          const isPartiallyPaid = !isFullyPaid && (order.payment_status === 'DeliveryChargePrePaid' || advancePaid > 0)
 
                           return (
-                            <tr key={order.id} className="hover:bg-slate-50/50">
+                            <tr key={order.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-brand-50/40'} hover:bg-brand-50/70 transition`}>
                               
                               {/* ID & Date */}
                               <td className="p-4">
@@ -1116,11 +1400,13 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                                 <p className="text-slate-500 font-mono text-[11px] mt-0.5">{order.customer_phone}</p>
                               </td>
 
-                              {/* Destination */}
-                              <td className="p-4 max-w-xs">
-                                <p className="text-slate-700 leading-tight line-clamp-2">{order.shipping_address}</p>
+                              {/* Destination (Compact with Tooltip) */}
+                              <td className="p-4 max-w-[150px] sm:max-w-[180px]" title={order.shipping_address}>
+                                <p className="text-slate-700 leading-tight truncate font-medium cursor-help" title={order.shipping_address}>
+                                  {order.shipping_address}
+                                </p>
                                 {order.payment_details?.shipping_metadata?.area_name && (
-                                  <span className="text-[10px] font-semibold text-slate-400 block mt-1">
+                                  <span className="text-[10px] font-semibold text-slate-400 block mt-1 truncate" title={`${order.payment_details.shipping_metadata.area_name}, ${order.payment_details.shipping_metadata.city_name}`}>
                                     {order.payment_details.shipping_metadata.area_name}, {order.payment_details.shipping_metadata.city_name}
                                   </span>
                                 )}
@@ -1170,33 +1456,151 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
 
                               {/* Payment status */}
                               <td className="p-4">
-                                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                                  isFullyPaid
-                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                                    : isPartiallyPaid
-                                      ? 'bg-blue-50 text-blue-700 border border-blue-100'
-                                      : order.payment_status === 'Failed'
-                                        ? 'bg-red-50 text-red-700 border border-red-100'
-                                        : 'bg-amber-50 text-amber-700 border border-amber-100'
-                                }`}>
-                                  {isFullyPaid && 'Fully Paid'}
-                                  {isPartiallyPaid && 'Partially Paid'}
-                                  {!isFullyPaid && !isPartiallyPaid && order.payment_status === 'Failed' && 'Failed'}
-                                  {!isFullyPaid && !isPartiallyPaid && order.payment_status !== 'Failed' && 'Pending'}
-                                </span>
-                                <span className="block text-[10px] text-slate-400 uppercase font-semibold mt-1">
-                                  {order.payment_method}
-                                </span>
+                                <div className="space-y-1.5">
+                                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                                    isFullyPaid
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                      : isPartiallyPaid
+                                        ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                                        : order.payment_status === 'Failed'
+                                          ? 'bg-red-50 text-red-700 border border-red-100'
+                                          : order.payment_method === 'BKASH_PERSONAL'
+                                            ? 'bg-pink-50 text-pink-700 border border-pink-200 font-black'
+                                            : 'bg-amber-50 text-amber-700 border border-amber-100'
+                                  }`}>
+                                    {isFullyPaid && 'Fully Paid'}
+                                    {isPartiallyPaid && 'Partially Paid'}
+                                    {!isFullyPaid && !isPartiallyPaid && order.payment_status === 'Failed' && 'Failed'}
+                                    {!isFullyPaid && !isPartiallyPaid && (order.payment_status === 'Pending Verification' || order.payment_method === 'BKASH_PERSONAL') && 'Verification Needed'}
+                                    {!isFullyPaid && !isPartiallyPaid && order.payment_status !== 'Failed' && order.payment_status !== 'Pending Verification' && order.payment_method !== 'BKASH_PERSONAL' && 'Pending'}
+                                  </span>
+
+                                  <span className={`block text-[10px] uppercase font-bold ${
+                                    order.payment_method === 'BKASH_PERSONAL' ? 'text-pink-600' : 'text-slate-400'
+                                  }`}>
+                                    {order.payment_method === 'BKASH_PERSONAL' ? 'bKash Personal' : order.payment_method}
+                                  </span>
+
+                                  {/* bKash Personal Details Box */}
+                                  {(order.payment_method === 'BKASH_PERSONAL' || order.payment_details?.transaction_id || order.payment_details?.sender_number) && (
+                                    <div className="p-2 rounded-lg bg-pink-50 border border-pink-200 text-[10px] space-y-1 min-w-[150px]">
+                                      {order.payment_details?.sender_number && (
+                                        <div className="flex items-center justify-between font-mono">
+                                          <span className="text-slate-500 font-sans">Sender:</span>
+                                          <div className="flex items-center gap-1 font-bold text-slate-800">
+                                            <span>{order.payment_details.sender_number}</span>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleCopyText(order.payment_details.sender_number, 'sender')}
+                                              className="text-slate-400 hover:text-pink-600 p-0.5"
+                                              title="Copy sender number"
+                                            >
+                                              {copiedText === `sender-${order.payment_details.sender_number}` ? (
+                                                <Check className="h-3 w-3 text-emerald-600" />
+                                              ) : (
+                                                <Copy className="h-3 w-3" />
+                                              )}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {order.payment_details?.transaction_id && (
+                                        <div className="flex items-center justify-between font-mono">
+                                          <span className="text-slate-500 font-sans">TrxID:</span>
+                                          <div className="flex items-center gap-1 font-bold text-pink-700">
+                                            <span className="uppercase">{order.payment_details.transaction_id}</span>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleCopyText(order.payment_details.transaction_id, 'trx')}
+                                              className="text-slate-400 hover:text-pink-600 p-0.5"
+                                              title="Copy TrxID"
+                                            >
+                                              {copiedText === `trx-${order.payment_details.transaction_id}` ? (
+                                                <Check className="h-3 w-3 text-emerald-600" />
+                                              ) : (
+                                                <Copy className="h-3 w-3" />
+                                              )}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      <div className="pt-1">
+                                        {order.payment_status === 'Failed' ? (
+                                          <div className="flex items-center justify-between w-full bg-white px-2 py-1 rounded border border-red-200 text-[10px]">
+                                            <span className="font-bold text-red-700 flex items-center gap-0.5">
+                                              <XCircle className="h-3 w-3" />
+                                              <span>Rejected</span>
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleVerifyBkashPayment(order, true)}
+                                              disabled={actionLoading === order.id}
+                                              className="text-pink-600 font-bold hover:underline ml-1"
+                                              title="Re-verify payment received"
+                                            >
+                                              Verify
+                                            </button>
+                                          </div>
+                                        ) : (order.payment_status === 'DeliveryChargePrePaid' || order.payment_status === 'FullyPaid' || order.payment_details?.verified) ? (
+                                          <div className="flex items-center justify-between w-full bg-white px-2 py-1 rounded border border-emerald-200 text-[10px]">
+                                            <span className="font-bold text-emerald-700 flex items-center gap-1">
+                                              <Check className="h-3 w-3 text-emerald-600" />
+                                              <span>{isPartiallyPaid ? (advancePaid > 0 ? `Advance Verified (৳${advancePaid.toLocaleString()})` : 'Advance Verified') : 'Verified'}</span>
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleVerifyBkashPayment(order, false)}
+                                              disabled={actionLoading === order.id}
+                                              className="text-slate-400 hover:text-red-600 ml-1 font-normal text-[9px]"
+                                              title="Cancel verification"
+                                            >
+                                              ✕
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <div className="flex items-center gap-1 w-full">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleVerifyBkashPayment(order, true)}
+                                              disabled={actionLoading === order.id}
+                                              className="flex-1 py-1 px-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] shadow-sm flex items-center justify-center gap-1 transition"
+                                              title="Mark payment as received & verified"
+                                            >
+                                              <Check className="h-3 w-3" />
+                                              <span>Verify</span>
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleVerifyBkashPayment(order, false)}
+                                              disabled={actionLoading === order.id}
+                                              className="py-1 px-1.5 rounded bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[10px] border border-red-200 flex items-center justify-center gap-0.5 transition"
+                                              title="Mark payment as not received / invalid"
+                                            >
+                                              <XCircle className="h-3 w-3" />
+                                              <span>Invalid</span>
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                               </td>
 
                               {/* Pricing */}
                               <td className="p-4 space-y-0.5 font-medium">
-                                <p className="text-slate-900 font-bold">৳{Number(order.total_price).toLocaleString()}</p>
-                                {isCod && (
+                                <p className="text-slate-900 font-bold">৳{totalOrderPrice.toLocaleString()}</p>
+                                {dueAmount > 0 ? (
                                   <p className="text-[10px] text-amber-600 font-bold">
-                                    COD: ৳{codProductAmount.toLocaleString()}
+                                    COD: ৳{dueAmount.toLocaleString()}
                                   </p>
-                                )}
+                                ) : isFullyPaid ? (
+                                  <p className="text-[10px] text-emerald-600 font-bold">
+                                    Paid (৳0 Due)
+                                  </p>
+                                ) : null}
                               </td>
 
                               {/* Courier Consignment & Booking */}
@@ -1291,6 +1695,21 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                                   <FileText className="h-3.5 w-3.5" />
                                   <span>Invoice</span>
                                 </a>
+                                {/* {order.customer_email && (
+                                  <button
+                                    onClick={() => handleSendInvoiceEmail(order)}
+                                    disabled={emailingOrderId === order.id}
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 shadow-sm text-xs font-semibold transition"
+                                    title={`Send Invoice Email to ${order.customer_email}`}
+                                  >
+                                    {emailingOrderId === order.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-600" />
+                                    ) : (
+                                      <Mail className="h-3.5 w-3.5 text-slate-500" />
+                                    )}
+                                    <span className="hidden xl:inline">Email</span>
+                                  </button>
+                                )} */}
                                 <button
                                   onClick={() => setDeleteConfirmOrder(order)}
                                   className="inline-flex items-center gap-1 p-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300 shadow-sm text-xs font-semibold transition"
@@ -1307,6 +1726,73 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                     </tbody>
                   </table>
                 </div>
+
+                {/* Pagination Footer */}
+                {sortedOrders.length > 0 && (
+                  <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+                    <div className="flex items-center gap-2">
+                      <span>Show:</span>
+                      <select
+                        value={pageSize}
+                        onChange={(e) => {
+                          setPageSize(Number(e.target.value))
+                          setCurrentPage(1)
+                        }}
+                        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-bold text-slate-800 outline-none focus:border-brand-500"
+                      >
+                        <option value={10}>10 per page</option>
+                        <option value={20}>20 per page (default)</option>
+                        <option value={50}>50 per page</option>
+                      </select>
+                      <span className="text-slate-400">
+                        | Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, sortedOrders.length)} of {sortedOrders.length} orders
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={currentPage <= 1}
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold disabled:opacity-40 disabled:cursor-not-allowed transition"
+                      >
+                        Previous
+                      </button>
+                      
+                      <div className="flex items-center gap-1 px-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1)
+                          .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                          .map((p, idx, arr) => (
+                            <React.Fragment key={p}>
+                              {idx > 0 && arr[idx - 1] !== p - 1 && (
+                                <span className="px-1 text-slate-400">...</span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setCurrentPage(p)}
+                                className={`h-7 w-7 rounded-lg text-xs font-bold transition ${
+                                  currentPage === p
+                                    ? 'bg-slate-900 text-white'
+                                    : 'bg-white border border-slate-200 hover:bg-slate-50 text-slate-700'
+                                }`}
+                              >
+                                {p}
+                              </button>
+                            </React.Fragment>
+                          ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={currentPage >= totalPages}
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold disabled:opacity-40 disabled:cursor-not-allowed transition"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -1479,12 +1965,38 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-brand-500"
                   >
                     <option value="Pending">Pending (Unpaid)</option>
+                    <option value="Pending Verification">Pending Verification (bKash Personal)</option>
                     <option value="DeliveryChargePrePaid">Partially Paid (Advance Received)</option>
-                    <option value="FullyPaid">Fully Paid Online</option>
+                    <option value="FullyPaid">Fully Paid (Verified / Online)</option>
                     <option value="Failed">Failed / Unsuccessful</option>
                   </select>
                 </div>
               </div>
+
+              {/* BKASH PERSONAL SENDER INFO CALLOUT (IF APPLICABLE) */}
+              {(editingOrder.payment_method === 'BKASH_PERSONAL' || editingOrder.payment_details?.transaction_id || editingOrder.payment_details?.sender_number) && (
+                <div className="p-3 rounded-2xl bg-pink-50 border border-pink-200 text-xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-pink-800 flex items-center gap-1.5">
+                      <Smartphone className="h-4 w-4" />
+                      <span>bKash Personal Payment Details</span>
+                    </span>
+                    <span className="text-[10px] uppercase font-bold text-pink-600 bg-pink-100 px-2 py-0.5 rounded-full">
+                      {editingOrder.payment_status}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 pt-1 font-mono text-[11px]">
+                    <div className="bg-white p-2 rounded-xl border border-pink-100">
+                      <span className="text-[10px] text-slate-400 font-sans block">Sender Phone:</span>
+                      <span className="font-bold text-slate-900">{editingOrder.payment_details?.sender_number || 'Not provided'}</span>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-pink-100">
+                      <span className="text-[10px] text-slate-400 font-sans block">TrxID:</span>
+                      <span className="font-bold text-pink-700 uppercase">{editingOrder.payment_details?.transaction_id || 'Not provided'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* SECTION 2: CUSTOMER DETAILS */}
               <div className="space-y-3">
@@ -1673,6 +2185,13 @@ export default function AdminDashboardClient({ initialOrders }: DashboardProps) 
                     <span>Products Subtotal:</span>
                     <span className="font-bold text-slate-900">৳{modalSubtotal.toLocaleString()}</span>
                   </div>
+
+                  {modalDiscount > 0 && (
+                    <div className="flex justify-between text-emerald-600 font-bold">
+                      <span>Promo Discount {editingOrder.promo_code ? `(${editingOrder.promo_code})` : ''}:</span>
+                      <span>-৳{modalDiscount.toLocaleString()}</span>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between text-slate-600 font-medium">
                     <span>Delivery Charge:</span>

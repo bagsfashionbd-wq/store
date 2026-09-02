@@ -10,7 +10,7 @@ import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { hasFullAccess, getRoleDetails, normalizeStaffRole } from '@/utils/staff'
 import { 
   BarChart3, ShoppingBag, Package, LogOut, MessageSquare, 
-  Settings, FolderTree, ShieldCheck, Menu, X, ExternalLink, Users
+  Settings, FolderTree, ShieldCheck, Menu, X, ExternalLink, Users, Megaphone
 } from 'lucide-react'
 import axios from 'axios'
 
@@ -145,6 +145,13 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
       icon: Package,
       isActive: pathname === '/stradmn/products',
       visible: true
+    },
+    {
+      name: isBangla ? 'প্রচার ও অফার' : 'Promotions',
+      href: '/stradmn/promotions',
+      icon: Megaphone,
+      isActive: pathname === '/stradmn/promotions',
+      visible: canSeeFullDashboard
     },
     {
       name: t('admin.categories'),

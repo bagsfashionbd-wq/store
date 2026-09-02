@@ -140,7 +140,8 @@ export async function PUT(request: NextRequest) {
     }
 
     const parsedDeliveryCharge = Number(delivery_charge !== undefined ? delivery_charge : existingOrder.delivery_charge)
-    const newTotalPrice = itemsSubtotal + parsedDeliveryCharge
+    const discountAmount = Number(existingOrder.discount_amount || 0)
+    const newTotalPrice = Math.max(0, itemsSubtotal + parsedDeliveryCharge - discountAmount)
 
     // 5. Update payment_details with shipping metadata and custom advance_paid
     const paymentDetails = existingOrder.payment_details || {}

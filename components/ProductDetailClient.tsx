@@ -2,11 +2,12 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
-import { ShoppingBag, ChevronRight, Truck, Check, AlertCircle, ArrowLeft, ArrowRight, Play } from 'lucide-react'
+import { ShoppingBag, ChevronRight, Truck, Check, AlertCircle, ArrowLeft, ArrowRight, Play, Heart } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import CartDrawer from '@/components/CartDrawer'
 import { useCart } from '@/context/CartContext'
+import { useCustomer } from '@/context/CustomerContext'
 import { useStore } from '@/context/StoreContext'
 import { parseProductVariations, VariationOption } from '@/components/AdminProductsClient'
 import ProductCard from '@/components/ProductCard'
@@ -42,8 +43,20 @@ interface ProductDetailClientProps {
 
 export default function ProductDetailClient({ product, categories, relatedProducts = [] }: ProductDetailClientProps) {
   const { addToCart } = useCart()
+  const { toggleWishlist, isInWishlist } = useCustomer()
   const { settings } = useStore()
   const { t, toBengaliDigits, isBangla } = useLanguage()
+  const [guestToast, setGuestToast] = useState(false)
+  
+  const isWishlisted = isInWishlist(product.id)
+
+  const handleWishlistToggle = async () => {
+    const res = await toggleWishlist(product.id)
+    if (res.isGuest && res.added) {
+      setGuestToast(true)
+      setTimeout(() => setGuestToast(false), 3500)
+    }
+  }
   
   const parsedOptions: VariationOption[] = parseProductVariations(product.variations, product.stock)
   
@@ -356,6 +369,33 @@ export default function ProductDetailClient({ product, categories, relatedProduc
                   <ShoppingBag className="h-5 w-5" />
                   {t('product.add_to_cart')}
                 </button>
+
+                {/* Wishlist Button */}
+                <button
+                  type="button"
+                  onClick={handleWishlistToggle}
+                  className={`flex items-center justify-center gap-2 px-4 rounded-xl border-2 transition h-12 font-bold text-xs ${
+                    isWishlisted
+                      ? 'border-pink-500 bg-pink-50 text-pink-600'
+                      : 'border-slate-200 hover:border-pink-300 hover:bg-pink-50/50 text-slate-700'
+                  }`}
+                  title={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                >
+                  <Heart className={`h-5 w-5 ${isWishlisted ? 'fill-current text-pink-600' : 'text-slate-500'}`} />
+                  <span className="hidden sm:inline">
+                    {isWishlisted
+                      ? (isBangla ? 'পছন্দে রাখা আছে' : 'Wishlisted')
+                      : (isBangla ? 'পছন্দে রাখুন' : 'Wishlist')}
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {/* Guest Wishlist Reminder Alert */}
+            {guestToast && (
+              <div className="p-3 rounded-xl bg-slate-900 text-white text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                <Heart className="h-4 w-4 text-pink-400 fill-current" />
+                <span>{isBangla ? 'পছন্দের তালিকায় যুক্ত হয়েছে! স্থায়ীভাবে সংরক্ষণ করতে লগইন করুন।' : 'Added to wishlist! Sign in to keep it saved permanently.'}</span>
               </div>
             )}
 

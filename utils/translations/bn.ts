@@ -263,6 +263,31 @@ export const bn = {
     stock_valuation: 'স্টকের মূল্যমান',
     inventory_health: 'ইনভেন্টরি বিশ্লেষণ',
     save_settings: 'সেটিংস সংরক্ষণ করুন',
-    logged_in_as: 'লগইন আছেন'
+    logged_in_as: 'লগইন আছেন',
+    promotions: 'প্রচার ও অফার',
+    coupons: 'প্রোমো কোড'
+  },
+  promotions: {
+    title: 'প্রচার ও অফার',
+    banner: 'পপ-আপ ব্যানার',
+    ribbon: 'হেডার রিবন',
+    active: 'চলমান',
+    scheduled: 'নির্ধারিত',
+    expired: 'মেয়াদোত্তীর্ণ',
+    promo_code: 'প্রোমো কোড',
+    discount: 'ছাড়',
+    usage: 'ব্যবহার',
+    valid_until: 'মেয়াদ'
+  },
+  account: {
+    my_account: 'আমার একাউন্ট',
+    my_orders: 'আমার অর্ডারসমূহ',
+    wishlist: 'পছন্দের তালিকা',
+    profile: 'প্রোফাইল তথ্য',
+    password: 'পাসওয়ার্ড পরিবর্তন',
+    sign_in: 'সাইন ইন',
+    sign_up: 'নতুন একাউন্ট',
+    logout: 'লগআউট',
+    save_changes: 'পরিবর্তন সংরক্ষণ করুন'
   }
 }

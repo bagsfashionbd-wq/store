@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { getStoreSettings } from '@/utils/settings'
 import { bookPathaoConsignment, bookSteadfastConsignment } from '@/utils/courier'
+import { sendInvoiceEmail } from '@/utils/email'
 import axios from 'axios'
 
 export const dynamic = 'force-dynamic'
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
 
     // Branch 2: NEW ORDER CREATION
     const { 
+      customer_id,
       customer_name, 
       customer_phone, 
       customer_email, 
@@ -107,6 +109,11 @@ export async function POST(request: NextRequest) {
       delivery_charge, 
       total_price, 
       payment_method,
+      promo_code,
+      promo_code_id,
+      discount_amount = 0,
+      sender_number,
+      transaction_id,
       cartItems 
     } = body
 
@@ -114,10 +121,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required order details' }, { status: 400 })
     }
 
-    // Step A: Insert order as 'Pending' in Supabase database
+    const isBkashPersonal = payment_method === 'BKASH_PERSONAL'
+    const initialPaymentStatus = isBkashPersonal ? 'Pending Verification' : 'Pending'
+
+    // Step A: Insert order in Supabase database
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
+        customer_id: customer_id || null,
         customer_name,
         customer_phone,
         customer_email,
@@ -129,8 +140,13 @@ export async function POST(request: NextRequest) {
         delivery_charge,
         total_price,
         payment_method,
-        payment_status: 'Pending',
+        payment_status: initialPaymentStatus,
+        promo_code: promo_code || '',
+        promo_code_id: promo_code_id || null,
+        discount_amount: Number(discount_amount || 0),
         payment_details: {
+          sender_number: sender_number || '',
+          transaction_id: transaction_id || '',
           shipping_metadata: {
             city_name,
             zone_name,
@@ -145,6 +161,20 @@ export async function POST(request: NextRequest) {
     if (orderError || !order) {
       console.error('Order creation error:', orderError)
       return NextResponse.json({ error: 'Failed to create order record' }, { status: 500 })
+    }
+
+    // Auto-save delivery address for logged-in customer
+    if (customer_id && shipping_address) {
+      await supabase
+        .from('customers')
+        .update({
+          address: shipping_address,
+          city_id: Number(city_id || 0),
+          zone_id: Number(zone_id || 0),
+          area_id: Number(area_id || 0),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', customer_id)
     }
 
     // Step B: Save order items
@@ -165,9 +195,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create order items' }, { status: 500 })
     }
 
-    // Step C: If COD and NO delivery charge prepayment is required by owner:
-    if (payment_method === 'COD' && !settings.cod_prepay_delivery) {
-      // Decrement stock directly for 100% Cash on Delivery
+    // Step C: If promo code used, increment usage_count
+    if (promo_code_id) {
+      try {
+        const { data: promoData } = await supabase.from('promo_codes').select('usage_count').eq('id', promo_code_id).single()
+        if (promoData) {
+          await supabase.from('promo_codes').update({ usage_count: (promoData.usage_count || 0) + 1 }).eq('id', promo_code_id)
+        }
+      } catch (err) {
+        console.error('Failed to increment promo code usage count:', err)
+      }
+    }
+
+    // Step D: Helper to decrement inventory stock
+    const decrementInventory = async () => {
       for (const item of cartItems) {
         if (!item.id) continue
         const { data: prod } = await supabase
@@ -210,6 +251,34 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+    }
+
+    // Step E: If bKash Personal (Send Money)
+    if (isBkashPersonal) {
+      await decrementInventory()
+
+      // Send invoice confirmation email
+      if (customer_email) {
+        sendInvoiceEmail({
+          toEmail: customer_email,
+          customerName: customer_name,
+          orderId: order.id,
+          createdAt: order.created_at,
+          shippingAddress: shipping_address,
+          customerPhone: customer_phone,
+          paymentMethod: 'bKash Personal (Send Money)',
+          paymentStatus: 'Pending Verification',
+          deliveryCharge: Number(delivery_charge),
+          totalPrice: Number(total_price),
+          discountAmount: Number(discount_amount || 0),
+          items: cartItems.map((c: any) => ({
+            name: c.name,
+            quantity: c.quantity,
+            price: Number(c.price),
+            selectedVariations: c.selectedVariations
+          }))
+        }).catch((err) => console.error('Error sending bKash Personal invoice email:', err))
+      }
 
       return NextResponse.json({
         checkoutUrl: `/order/confirmation?order_id=${order.id}`,
@@ -217,7 +286,62 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Step D: Determine bKash payment amount (delivery charge for COD with prepayment, full amount for BKASH)
+    // Step F: If COD (without prepayment OR with bKash Personal advance prepay):
+    const isPersonalPrepay = payment_method === 'COD' && settings.cod_prepay_delivery && (sender_number || transaction_id || (settings.bkash_personal_enabled && !settings.bkash_enabled))
+    if (payment_method === 'COD' && (!settings.cod_prepay_delivery || isPersonalPrepay)) {
+      await decrementInventory()
+
+      // If advance delivery prepayment was sent via bKash Personal, update advance_paid in order row
+      if (isPersonalPrepay) {
+        await supabase
+          .from('orders')
+          .update({
+            payment_status: 'Pending Verification',
+            payment_details: {
+              sender_number: sender_number || '',
+              transaction_id: transaction_id || '',
+              advance_paid: Number(delivery_charge),
+              shipping_metadata: {
+                city_name,
+                zone_name,
+                area_name,
+                shipping_provider
+              }
+            }
+          })
+          .eq('id', order.id)
+      }
+
+      // Send immediate invoice email for COD orders
+      if (customer_email) {
+        sendInvoiceEmail({
+          toEmail: customer_email,
+          customerName: customer_name,
+          orderId: order.id,
+          createdAt: order.created_at,
+          shippingAddress: shipping_address,
+          customerPhone: customer_phone,
+          paymentMethod: isPersonalPrepay ? 'Cash on Delivery (Advance Paid via bKash)' : 'Cash on Delivery (100%)',
+          paymentStatus: isPersonalPrepay ? 'Advance Paid (Pending Verification)' : 'Pending',
+          deliveryCharge: Number(delivery_charge),
+          totalPrice: Number(total_price),
+          discountAmount: Number(discount_amount || 0),
+          items: cartItems.map((c: any) => ({
+            name: c.name,
+            quantity: c.quantity,
+            price: Number(c.price),
+            selectedVariations: c.selectedVariations
+          }))
+        }).catch((err) => console.error('Error sending COD invoice email:', err))
+      }
+
+      return NextResponse.json({
+        checkoutUrl: `/order/confirmation?order_id=${order.id}`,
+        orderId: order.id
+      })
+    }
+
+    // Step G: Determine bKash Merchant payment amount (delivery charge for COD with prepayment, full amount for BKASH)
     const paymentAmount = payment_method === 'COD' ? delivery_charge : total_price
 
     // Step E: Create bKash Payment link
@@ -398,6 +522,34 @@ export async function GET(request: NextRequest) {
             }
           }
         }
+      }
+
+      // Send invoice email asynchronously if customer provided email
+      if (order?.customer_email) {
+        const { data: fullItems } = await supabase
+          .from('order_items')
+          .select('*, products(name)')
+          .eq('order_id', orderId)
+
+        sendInvoiceEmail({
+          toEmail: order.customer_email,
+          customerName: order.customer_name,
+          orderId: order.id,
+          createdAt: order.created_at,
+          shippingAddress: order.shipping_address,
+          customerPhone: order.customer_phone,
+          paymentMethod: `bKash Online (${paymentStatus})`,
+          paymentStatus: paymentStatus,
+          deliveryCharge: Number(order.delivery_charge),
+          totalPrice: Number(order.total_price),
+          discountAmount: Number(order.discount_amount || 0),
+          items: (fullItems || []).map((c: any) => ({
+            name: c.products?.name || 'Product',
+            quantity: c.quantity,
+            price: Number(c.price),
+            selectedVariations: c.selected_variations
+          }))
+        }).catch((err) => console.error('Error sending invoice email in bKash callback:', err))
       }
 
       return NextResponse.redirect(`${NEXT_PUBLIC_APP_URL}/order/confirmation?order_id=${orderId}&trx_id=${result.trxID}`)
