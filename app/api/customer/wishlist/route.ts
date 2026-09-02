@@ -10,13 +10,31 @@ async function getAuthenticatedCustomerId() {
   if (!user) return null
 
   const adminDb = createAdminClient()
+  const cleanEmail = user.email?.toLowerCase().trim() || ''
+
   const { data: customer } = await adminDb
     .from('customers')
     .select('id')
-    .or(`user_id.eq.${user.id},email.ilike.${user.email}`)
-    .single()
+    .or(`user_id.eq.${user.id},email.ilike.${cleanEmail}`)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
-  return customer?.id || null
+  if (customer?.id) return customer.id
+
+  // Create customer row on demand if missing
+  const { data: newCust } = await adminDb
+    .from('customers')
+    .insert({
+      user_id: user.id,
+      email: cleanEmail,
+      full_name: user.user_metadata?.full_name || cleanEmail.split('@')[0],
+      phone: user.user_metadata?.phone || ''
+    })
+    .select('id')
+    .maybeSingle()
+
+  return newCust?.id || user.id
 }
 
 // GET: Fetch customer wishlist

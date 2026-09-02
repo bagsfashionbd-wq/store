@@ -20,7 +20,9 @@ export async function GET() {
       .from('customers')
       .select('*')
       .or(`user_id.eq.${user.id},email.ilike.${cleanEmail}`)
-      .single()
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
     const conditions: string[] = [`user_id.eq.${user.id}`, `customer_email.ilike.${cleanEmail}`]
 

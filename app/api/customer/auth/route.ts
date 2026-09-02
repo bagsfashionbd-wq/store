@@ -21,7 +21,9 @@ export async function POST(request: NextRequest) {
         .from('customers')
         .select('id, full_name, email, phone')
         .eq('phone', cleanPhone)
-        .single()
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
       if (existingCustomer) {
         return NextResponse.json({
@@ -170,7 +172,9 @@ export async function POST(request: NextRequest) {
           .from('customers')
           .select('email')
           .eq('phone', cleanPhone)
-          .single()
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
 
         if (!matchedCustomer || !matchedCustomer.email) {
           return NextResponse.json({ error: 'No customer account found with this phone number.' }, { status: 404 })
@@ -197,7 +201,9 @@ export async function POST(request: NextRequest) {
         .from('customers')
         .select('*')
         .or(`user_id.eq.${signInData.user.id},email.ilike.${emailToAuth}`)
-        .single()
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
       return NextResponse.json({
         success: true,

@@ -16,13 +16,15 @@ export async function GET() {
     const adminDb = createAdminClient()
     const cleanEmail = user.email?.toLowerCase().trim() || ''
 
-    const { data: customer, error } = await adminDb
+    const { data: customer } = await adminDb
       .from('customers')
       .select('*')
       .or(`user_id.eq.${user.id},email.ilike.${cleanEmail}`)
-      .single()
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-    if (error || !customer) {
+    if (!customer) {
       // If customer record doesn't exist yet but user exists in auth.users
       return NextResponse.json({
         customer: {
@@ -30,7 +32,11 @@ export async function GET() {
           user_id: user.id,
           full_name: user.user_metadata?.full_name || cleanEmail.split('@')[0],
           phone: user.user_metadata?.phone || '',
-          email: cleanEmail
+          email: cleanEmail,
+          address: '',
+          city_id: 0,
+          zone_id: 0,
+          area_id: 0
         }
       })
     }
@@ -56,26 +62,83 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const { full_name, phone, avatar_url, address, city_id, zone_id, area_id } = body
 
-    const updates: Record<string, any> = {
-      updated_at: new Date().toISOString()
+    const cleanEmail = user.email?.toLowerCase().trim() || ''
+    const cleanPhone = phone !== undefined ? phone.trim().replace(/[^0-9+]/g, '') : undefined
+    const cleanName = full_name !== undefined ? full_name.trim() : undefined
+
+    // Check if customer record exists
+    const { data: existingCustomer } = await adminDb
+      .from('customers')
+      .select('*')
+      .or(`user_id.eq.${user.id},email.ilike.${cleanEmail}`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    let updatedCustomer: any = null
+
+    if (existingCustomer) {
+      const updates: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+        user_id: user.id,
+        email: cleanEmail
+      }
+
+      if (cleanName !== undefined) updates.full_name = cleanName
+      if (cleanPhone !== undefined) updates.phone = cleanPhone
+      if (avatar_url !== undefined) updates.avatar_url = avatar_url
+      if (address !== undefined) updates.address = address.trim()
+      if (city_id !== undefined) updates.city_id = Number(city_id || 0)
+      if (zone_id !== undefined) updates.zone_id = Number(zone_id || 0)
+      if (area_id !== undefined) updates.area_id = Number(area_id || 0)
+
+      const { data, error } = await adminDb
+        .from('customers')
+        .update(updates)
+        .eq('id', existingCustomer.id)
+        .select()
+        .maybeSingle()
+
+      if (error) throw error
+      updatedCustomer = data || { ...existingCustomer, ...updates }
+    } else {
+      // Create new customer record for this user
+      const newCustomer = {
+        user_id: user.id,
+        email: cleanEmail,
+        full_name: cleanName || user.user_metadata?.full_name || cleanEmail.split('@')[0],
+        phone: cleanPhone || user.user_metadata?.phone || '',
+        avatar_url: avatar_url || null,
+        address: address ? address.trim() : '',
+        city_id: Number(city_id || 0),
+        zone_id: Number(zone_id || 0),
+        area_id: Number(area_id || 0),
+        updated_at: new Date().toISOString()
+      }
+
+      const { data, error } = await adminDb
+        .from('customers')
+        .insert(newCustomer)
+        .select()
+        .maybeSingle()
+
+      if (error) throw error
+      updatedCustomer = data || newCustomer
     }
 
-    if (full_name !== undefined) updates.full_name = full_name.trim()
-    if (phone !== undefined) updates.phone = phone.trim().replace(/[^0-9+]/g, '')
-    if (avatar_url !== undefined) updates.avatar_url = avatar_url
-    if (address !== undefined) updates.address = address.trim()
-    if (city_id !== undefined) updates.city_id = Number(city_id || 0)
-    if (zone_id !== undefined) updates.zone_id = Number(zone_id || 0)
-    if (area_id !== undefined) updates.area_id = Number(area_id || 0)
-
-    const { data: updatedCustomer, error } = await adminDb
-      .from('customers')
-      .update(updates)
-      .or(`user_id.eq.${user.id},email.ilike.${user.email}`)
-      .select()
-      .single()
-
-    if (error) throw error
+    // Sync auth user metadata
+    try {
+      if (cleanName || cleanPhone) {
+        await userClient.auth.updateUser({
+          data: {
+            ...(cleanName ? { full_name: cleanName } : {}),
+            ...(cleanPhone ? { phone: cleanPhone } : {})
+          }
+        })
+      }
+    } catch (metaErr) {
+      console.warn('Could not sync user metadata:', metaErr)
+    }
 
     return NextResponse.json({ success: true, customer: updatedCustomer })
   } catch (error: any) {
