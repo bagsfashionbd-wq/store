@@ -1795,7 +1795,6 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                       Leave blank to use the default sandbox (<code className="text-brand-600">onboarding@resend.dev</code>). If you added a custom domain in Resend, enter your domain's email here.
                     </p>
                   </div>
-
                   {/* AUTOMATED INVOICE EMAILS TOGGLE */}
                   <div className="pt-3 border-t border-slate-200">
                     <div className="flex items-center justify-between">
