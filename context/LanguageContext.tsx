@@ -32,7 +32,7 @@ export function toBengaliDigits(input: number | string): string {
 }
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<Language>('bn') // Default to Bangla for Bangladeshi store, or read from storage
+  const [language, setLanguageState] = useState<Language>('en') // Default to English, or read from storage
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -42,13 +42,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       if (stored === 'en' || stored === 'bn') {
         setLanguageState(stored)
       } else {
-        // Default to Bengali or English based on browser language
-        const browserLang = navigator.language.toLowerCase()
-        if (browserLang.includes('bn') || browserLang.includes('bd')) {
-          setLanguageState('bn')
-        } else {
-          setLanguageState('bn') // Default friendly Bengali
-        }
+        setLanguageState('en') // Default to English
       }
     } catch {
       // Ignore localStorage errors

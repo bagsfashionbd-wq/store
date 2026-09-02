@@ -29,6 +29,7 @@ export const en = {
     subtotal: 'Subtotal',
     currency: '৳',
     all: 'All',
+    view_all: 'View All',
     none: 'None',
     yes: 'Yes',
     no: 'No',
@@ -44,6 +45,7 @@ export const en = {
   nav: {
     home: 'Home',
     all_categories: 'All Categories',
+    all_products: 'All Products',
     featured: 'Featured',
     trending: 'Trending',
     best_seller: 'Best Seller',
@@ -86,6 +88,7 @@ export const en = {
     delivery_info: 'Delivery: Inside Dhaka 1-2 days, Outside Dhaka 2-3 days.',
     cash_on_delivery: 'Cash on Delivery Available',
     free_exchange: 'Easy exchange & return policy',
+    view_all: 'View All',
     view_product: 'View Details',
     related_products: 'You May Also Like',
     share: 'Share Product',
