@@ -6,6 +6,8 @@ import { useStore } from '@/context/StoreContext'
 import { formatExternalUrl } from '@/utils/url'
 import { Phone, Mail, MapPin, ArrowUpRight, MessageCircle } from 'lucide-react'
 
+import { useLanguage } from '@/context/LanguageContext'
+
 // Helper for formatting WhatsApp URL
 function getWhatsAppUrl(num: string, storeName: string) {
   const digits = num.replace(/\D/g, '')
@@ -16,6 +18,7 @@ function getWhatsAppUrl(num: string, storeName: string) {
 
 export default function Footer() {
   const { settings, categories } = useStore()
+  const { t, toBengaliDigits, isBangla } = useLanguage()
 
   // Only show top 5 parent categories
   const parentCategories = categories.filter((c) => !c.parent_id).slice(0, 5)
@@ -118,17 +121,17 @@ export default function Footer() {
 
             {/* Line under store name: Heading from hero banner */}
             <p className="text-xs font-bold text-brand-400 tracking-wide">
-              {heroHeading || settings.store_tagline || 'Quality Products & Reliable Service'}
+              {heroHeading || settings.store_tagline || (isBangla ? 'সেরা মানের পণ্য ও দ্রুত ডেলিভারি সেবা' : 'Quality Products & Reliable Service')}
             </p>
 
             <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
-              {settings.hero_description || settings.store_tagline || 'Your trusted online destination for quality products in Bangladesh.'}
+              {settings.hero_description || settings.store_tagline || (isBangla ? 'সারা বাংলাদেশে আপনার বিশ্বস্ত অনলাইন শপ।' : 'Your trusted online destination for quality products in Bangladesh.')}
             </p>
 
             {/* Social Media Channels */}
             {(socialLinks.length > 0 || settings.contact_whatsapp) && (
               <div className="pt-2 space-y-2">
-                <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Connect With Us</p>
+                <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">{t('footer.connect_with_us')}</p>
                 <div className="flex flex-wrap items-center gap-2">
                   {/* WhatsApp Direct Chat */}
                   {settings.contact_whatsapp && (
@@ -165,31 +168,31 @@ export default function Footer() {
 
           {/* Col 2: Quick Links */}
           <div className="md:col-span-2 space-y-3">
-            <p className="text-xs font-bold uppercase tracking-wider text-white">Quick Links</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-white">{t('footer.quick_links')}</p>
             <ul className="space-y-2 text-xs">
               <li>
-                <Link href="/" className="hover:text-brand-400 transition-colors">Home</Link>
+                <Link href="/" className="hover:text-brand-400 transition-colors">{t('nav.home')}</Link>
               </li>
               {hasAbout && (
                 <li>
-                  <Link href="/about" className="hover:text-brand-400 transition-colors">About Us</Link>
+                  <Link href="/about" className="hover:text-brand-400 transition-colors">{t('about.about_us')}</Link>
                 </li>
               )}
               <li>
-                <Link href="/contact" className="hover:text-brand-400 transition-colors">Contact Us</Link>
+                <Link href="/contact" className="hover:text-brand-400 transition-colors">{t('nav.contact')}</Link>
               </li>
               <li>
-                <Link href="/track" className="hover:text-brand-400 transition-colors font-semibold text-brand-400">Track Order</Link>
+                <Link href="/track" className="hover:text-brand-400 transition-colors font-semibold text-brand-400">{t('nav.track_order')}</Link>
               </li>
               <li>
-                <Link href="/checkout" className="hover:text-brand-400 transition-colors">Checkout</Link>
+                <Link href="/checkout" className="hover:text-brand-400 transition-colors">{t('checkout.checkout')}</Link>
               </li>
             </ul>
           </div>
 
           {/* Col 3: Categories */}
           <div className="md:col-span-2 space-y-3">
-            <p className="text-xs font-bold uppercase tracking-wider text-white">Categories</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-white">{t('footer.categories')}</p>
             <ul className="space-y-2 text-xs">
               {parentCategories.map((cat) => (
                 <li key={cat.id}>
@@ -203,7 +206,7 @@ export default function Footer() {
 
           {/* Col 4: Contact & Support (Separated Phone & WhatsApp) */}
           <div className="md:col-span-3 space-y-3">
-            <p className="text-xs font-bold uppercase tracking-wider text-white">Contact & Support</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-white">{t('footer.contact_support')}</p>
             <div className="space-y-2.5 text-xs">
               {settings.contact_phone && (
                 <a
@@ -212,7 +215,7 @@ export default function Footer() {
                 >
                   <Phone className="h-4 w-4 text-brand-400 flex-shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
                   <div>
-                    <span className="text-[10px] text-slate-500 block uppercase font-bold">Call Support</span>
+                    <span className="text-[10px] text-slate-500 block uppercase font-bold">{isBangla ? 'ফোন সহায়তা' : 'Call Support'}</span>
                     <span>{settings.contact_phone}</span>
                   </div>
                 </a>
@@ -227,7 +230,7 @@ export default function Footer() {
                 >
                   <MessageCircle className="h-4 w-4 text-emerald-400 flex-shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
                   <div>
-                    <span className="text-[10px] text-emerald-600 block uppercase font-bold">WhatsApp Direct</span>
+                    <span className="text-[10px] text-emerald-600 block uppercase font-bold">{isBangla ? 'হোয়াটসঅ্যাপ' : 'WhatsApp Direct'}</span>
                     <span>{settings.contact_whatsapp}</span>
                   </div>
                 </a>
@@ -240,7 +243,7 @@ export default function Footer() {
                 >
                   <Mail className="h-4 w-4 text-brand-400 flex-shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
                   <div>
-                    <span className="text-[10px] text-slate-500 block uppercase font-bold">Email Inquiries</span>
+                    <span className="text-[10px] text-slate-500 block uppercase font-bold">{isBangla ? 'ইমেইল' : 'Email Inquiries'}</span>
                     <span>{settings.contact_email}</span>
                   </div>
                 </a>
@@ -250,7 +253,7 @@ export default function Footer() {
                 <div className="flex items-start gap-2 text-slate-400">
                   <MapPin className="h-4 w-4 text-brand-400 flex-shrink-0 mt-0.5" />
                   <div>
-                    <span className="text-[10px] text-slate-500 block uppercase font-bold">Store Address</span>
+                    <span className="text-[10px] text-slate-500 block uppercase font-bold">{isBangla ? 'দোকানের ঠিকানা' : 'Store Address'}</span>
                     <span>{settings.contact_address}</span>
                   </div>
                 </div>
@@ -261,7 +264,7 @@ export default function Footer() {
                   href="/contact"
                   className="inline-flex items-center gap-1 text-xs font-bold text-brand-400 hover:text-brand-300 transition"
                 >
-                  <span>Send a direct message</span>
+                  <span>{isBangla ? 'সরাসরি বার্তা পাঠান' : 'Send a direct message'}</span>
                   <ArrowUpRight className="h-3 w-3" />
                 </Link>
               </div>
@@ -272,9 +275,9 @@ export default function Footer() {
 
         {/* Copyright */}
         <div className="mt-12 pt-6 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© {new Date().getFullYear()} {settings.store_name}. All rights reserved.</p>
+          <p>© {isBangla ? toBengaliDigits(new Date().getFullYear()) : new Date().getFullYear()} {settings.store_name}. {t('footer.all_rights_reserved')}</p>
           <p className="text-[11px] text-slate-600">
-            Powered by Secure White-Label E-Commerce Platform
+            {settings.store_name} • E-Commerce Platform
           </p>
         </div>
       </div>

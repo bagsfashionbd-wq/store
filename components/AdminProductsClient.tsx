@@ -5,8 +5,10 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { useStore } from '@/context/StoreContext'
+import { useLanguage } from '@/context/LanguageContext'
 import ImageUploader from '@/components/ImageUploader'
 import AdminSidebar from '@/components/AdminSidebar'
+import RichTextEditor from '@/components/RichTextEditor'
 import { 
   BarChart3, ShoppingBag, Package, LogOut, Plus, Trash2, Edit2,
   X, Check, Sparkles, FolderTree, Settings, ShieldCheck, ChevronRight,
@@ -25,6 +27,7 @@ export interface VariationValue {
   label: string
   stock: number
   image_url: string
+  price?: number
 }
 
 export interface VariationOption {
@@ -37,6 +40,7 @@ export interface Product {
   category_id: string
   name: string
   slug: string
+  short_description?: string
   description: string
   price: number
   old_price: number
@@ -69,7 +73,8 @@ export function parseProductVariations(variations: any, fallbackStock = 0): Vari
         ? opt.values.map((v: any) => ({
             label: v.label || String(v),
             stock: typeof v.stock === 'number' ? v.stock : fallbackStock,
-            image_url: v.image_url || ''
+            image_url: v.image_url || '',
+            price: v.price !== undefined && v.price !== null && v.price !== '' ? Number(v.price) : undefined
           }))
         : []
     }))
@@ -87,7 +92,8 @@ export function parseProductVariations(variations: any, fallbackStock = 0): Vari
         values: values.map((v: any) => ({
           label: String(v),
           stock: stockPerVal,
-          image_url: ''
+          image_url: '',
+          price: undefined
         }))
       })
     }
@@ -100,6 +106,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
   const router = useRouter()
   const supabase = createClient()
   const { settings } = useStore()
+  const { t, toBengaliDigits, isBangla } = useLanguage()
 
   const [products, setProducts] = useState<Product[]>(initialProducts)
   const [categories] = useState<Category[]>(initialCategories)
@@ -113,6 +120,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
   const [oldPrice, setOldPrice] = useState('')
   const [buyingPrice, setBuyingPrice] = useState('')
   const [stock, setStock] = useState('10')
+  const [shortDescription, setShortDescription] = useState('')
   const [description, setDescription] = useState('')
   const [images, setImages] = useState<string[]>([])
   const [variationOptions, setVariationOptions] = useState<VariationOption[]>([])
@@ -129,6 +137,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
   const [editOldPrice, setEditOldPrice] = useState('')
   const [editBuyingPrice, setEditBuyingPrice] = useState('')
   const [editStock, setEditStock] = useState('')
+  const [editShortDescription, setEditShortDescription] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editImages, setEditImages] = useState<string[]>([])
   const [editVariationOptions, setEditVariationOptions] = useState<VariationOption[]>([])
@@ -253,6 +262,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
     setEditOldPrice(product.old_price ? String(product.old_price) : '')
     setEditBuyingPrice(product.buying_price !== undefined && product.buying_price !== null ? String(product.buying_price) : '')
     setEditStock(String(product.stock))
+    setEditShortDescription(product.short_description || '')
     setEditDescription(product.description || '')
     setEditImages(product.images || [])
     setEditVariationOptions(parseProductVariations(product.variations, product.stock))
@@ -302,6 +312,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
         old_price: oldPrice ? Number(oldPrice) : 0,
         buying_price: buyingPrice ? Number(buyingPrice) : 0,
         stock: finalStock,
+        short_description: shortDescription.trim(),
         description,
         images,
         variations: variationsPayload
@@ -328,6 +339,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
         setOldPrice('')
         setBuyingPrice('')
         setStock('10')
+        setShortDescription('')
         setDescription('')
         setImages([])
         setVariationOptions([])
@@ -387,6 +399,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
         old_price: editOldPrice ? Number(editOldPrice) : 0,
         buying_price: editBuyingPrice ? Number(editBuyingPrice) : 0,
         stock: finalStock,
+        short_description: editShortDescription.trim(),
         description: editDescription,
         images: editImages,
         variations: variationsPayload
@@ -515,9 +528,10 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                 {/* Values Table */}
                 <div className="space-y-2 pt-1 border-t border-slate-100">
                   <div className="grid grid-cols-12 gap-2 text-[10px] font-bold text-slate-400 uppercase">
-                    <span className="col-span-5">Value Label</span>
+                    <span className="col-span-4">Value Label</span>
                     <span className="col-span-2 text-center">Stock</span>
-                    <span className="col-span-4">Option Photo</span>
+                    <span className="col-span-3 text-center">Variant Price (৳)</span>
+                    <span className="col-span-2">Photo</span>
                     <span className="col-span-1"></span>
                   </div>
 
@@ -532,7 +546,7 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                           updated[optIdx].values[valIdx].label = e.target.value
                           setOptions(updated)
                         }}
-                        className="col-span-5 rounded border border-slate-200 px-2 py-1 text-xs outline-none focus:border-brand-500"
+                        className="col-span-4 rounded border border-slate-200 px-2 py-1 text-xs outline-none focus:border-brand-500"
                       />
                       <input
                         type="number"
@@ -546,7 +560,21 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                         }}
                         className="col-span-2 rounded border border-slate-200 px-2 py-1 text-xs outline-none focus:border-brand-500 text-center"
                       />
-                      <div className="col-span-4 flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Default"
+                        value={val.price !== undefined ? val.price : ''}
+                        onChange={(e) => {
+                          const updated = [...options]
+                          const valNum = e.target.value === '' ? undefined : Number(e.target.value)
+                          updated[optIdx].values[valIdx].price = valNum
+                          setOptions(updated)
+                        }}
+                        className="col-span-3 rounded border border-slate-200 px-2 py-1 text-xs outline-none focus:border-brand-500 text-center placeholder:text-slate-300"
+                        title="Optional custom price for this variant (leave blank to use base price)"
+                      />
+                      <div className="col-span-2 flex items-center gap-1">
                         {val.image_url ? (
                           <div className="flex items-center gap-1">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -564,9 +592,9 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                             </button>
                           </div>
                         ) : (
-                          <label className="cursor-pointer inline-flex items-center gap-1 text-[11px] text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-2 py-1 rounded font-medium transition">
-                            <Upload className="h-3 w-3" />
-                            <span>Upload</span>
+                          <label className="cursor-pointer inline-flex items-center gap-1 text-[10px] text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-1.5 py-1 rounded font-medium transition">
+                            <Upload className="h-2.5 w-2.5" />
+                            <span>Photo</span>
                             <input
                               type="file"
                               accept="image/*"
@@ -773,14 +801,35 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                       )}
                     </div>
 
+                    {/* Short Description (Product Card Preview) */}
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Description</label>
-                      <textarea
-                        rows={3}
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Detailed product specifications..."
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold text-slate-700 uppercase">
+                          Short Description (Card Summary)
+                        </label>
+                        <span className={`text-[10px] font-semibold ${shortDescription.length > 150 ? 'text-red-500' : 'text-slate-400'}`}>
+                          {shortDescription.length} / 150 chars (max 2-3 lines)
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        maxLength={180}
+                        value={shortDescription}
+                        onChange={(e) => setShortDescription(e.target.value)}
+                        placeholder="Brief summary for storefront product cards..."
                         className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
+                      />
+                    </div>
+
+                    {/* Detailed Rich Text Description */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        Full Product Description & Specs
+                      </label>
+                      <RichTextEditor
+                        value={description}
+                        onChange={setDescription}
+                        placeholder="Write formatted product specifications, highlights, bullet points..."
                       />
                     </div>
 
@@ -1006,13 +1055,35 @@ export default function AdminProductsClient({ initialProducts, initialCategories
                       )}
                     </div>
 
+                    {/* Short Description (Product Card Preview) */}
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Description</label>
-                      <textarea
-                        rows={3}
-                        value={editDescription}
-                        onChange={(e) => setEditDescription(e.target.value)}
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold text-slate-700 uppercase">
+                          Short Description (Card Summary)
+                        </label>
+                        <span className={`text-[10px] font-semibold ${editShortDescription.length > 150 ? 'text-red-500' : 'text-slate-400'}`}>
+                          {editShortDescription.length} / 150 chars (max 2-3 lines)
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        maxLength={180}
+                        value={editShortDescription}
+                        onChange={(e) => setEditShortDescription(e.target.value)}
+                        placeholder="Brief summary for storefront product cards..."
                         className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500"
+                      />
+                    </div>
+
+                    {/* Detailed Rich Text Description */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        Full Product Description & Specs
+                      </label>
+                      <RichTextEditor
+                        value={editDescription}
+                        onChange={setEditDescription}
+                        placeholder="Write formatted product specifications, highlights, bullet points..."
                       />
                     </div>
 

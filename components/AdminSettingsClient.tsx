@@ -4,17 +4,18 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
+import { useLanguage } from '@/context/LanguageContext'
 import { StoreSettings } from '@/utils/settings'
 import { formatExternalUrl } from '@/utils/url'
 import { THEME_PALETTES } from '@/utils/theme'
 import { formatGoogleMapsEmbedUrl } from '@/utils/map'
 import ImageUploader from '@/components/ImageUploader'
 import AdminSidebar from '@/components/AdminSidebar'
-import { 
-  BarChart3, ShoppingBag, Package, LogOut, Settings, Save, 
-  Check, AlertCircle, RefreshCw, Upload, Sparkles, Truck, 
+import {
+  BarChart3, ShoppingBag, Package, LogOut, Settings, Save,
+  Check, AlertCircle, RefreshCw, Upload, Sparkles, Truck,
   CreditCard, Palette, Layout, ExternalLink, Layers, Info, MapPin, Phone, Mail, MessageSquare, Eye,
-  Share2, MessageCircle, Globe
+  Share2, MessageCircle, Globe, Smartphone, X, Clock, Send, Loader2
 } from 'lucide-react'
 import axios from 'axios'
 
@@ -25,12 +26,32 @@ interface AdminSettingsClientProps {
 export default function AdminSettingsClient({ initialSettings }: AdminSettingsClientProps) {
   const router = useRouter()
   const supabase = createClient()
+  const { t, isBangla } = useLanguage()
 
   const [settings, setSettings] = useState<StoreSettings>(initialSettings)
-  const [activeTab, setActiveTab] = useState<'branding' | 'hero' | 'collections' | 'payment' | 'shipping' | 'about'>('branding')
+  const [activeTab, setActiveTab] = useState<'branding' | 'hero' | 'collections' | 'payment' | 'shipping' | 'tracking' | 'about'>('branding')
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [bkashWarningModal, setBkashWarningModal] = useState(false)
+  const [testDigestLoading, setTestDigestLoading] = useState(false)
+
+  const handleSendTestDailyDigest = async () => {
+    setTestDigestLoading(true)
+    try {
+      const target = (settings.daily_digest_email || settings.contact_email || '').trim()
+      const res = await axios.post('/api/cron/daily-digest', { email: target })
+      if (res.data?.success) {
+        alert(`Daily pending orders summary successfully sent to ${res.data.result?.recipient || target || 'configured email'}!`)
+      } else {
+        alert(res.data?.error || 'Failed to send test summary.')
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error || err.message || 'Failed to send test summary.')
+    } finally {
+      setTestDigestLoading(false)
+    }
+  }
 
   const handleSave = async (customPayload?: Partial<StoreSettings>) => {
     setSaving(true)
@@ -64,7 +85,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-slate-100 text-slate-800">
-      
+
       {/* UNIFIED SIDEBAR */}
       <AdminSidebar />
 
@@ -82,12 +103,12 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
           >
             {saveSuccess ? (
               <>
-                <Check className="h-4 w-4" /> 
+                <Check className="h-4 w-4" />
                 <span className="hidden xs:inline sm:inline">Saved!</span>
               </>
             ) : (
               <>
-                <Save className="h-4 w-4" /> 
+                <Save className="h-4 w-4" />
                 <span>{saving ? 'Saving...' : 'Save Settings'}</span>
               </>
             )}
@@ -95,7 +116,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
         </header>
 
         <main className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-4 sm:space-y-6">
-          
+
           {errorMsg && (
             <div className="flex items-center gap-2 p-3.5 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-semibold">
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
@@ -107,63 +128,66 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
           <div className="flex border-b border-slate-200 bg-white rounded-t-2xl px-2 sm:px-4 gap-1 sm:gap-2 overflow-x-auto no-scrollbar">
             <button
               onClick={() => setActiveTab('branding')}
-              className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${
-                activeTab === 'branding'
+              className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${activeTab === 'branding'
                   ? 'border-brand-600 text-brand-600'
                   : 'border-transparent text-slate-500 hover:text-slate-900'
-              }`}
+                }`}
             >
               <Palette className="h-4 w-4" /> Branding & Theme
             </button>
             <button
               onClick={() => setActiveTab('hero')}
-              className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${
-                activeTab === 'hero'
+              className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${activeTab === 'hero'
                   ? 'border-brand-600 text-brand-600'
                   : 'border-transparent text-slate-500 hover:text-slate-900'
-              }`}
+                }`}
             >
               <Layout className="h-4 w-4" /> Hero Banner
             </button>
             <button
               onClick={() => setActiveTab('collections')}
-              className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${
-                activeTab === 'collections'
+              className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${activeTab === 'collections'
                   ? 'border-brand-600 text-brand-600'
                   : 'border-transparent text-slate-500 hover:text-slate-900'
-              }`}
+                }`}
             >
               <Sparkles className="h-4 w-4" /> Collections & Showcase
             </button>
             <button
               onClick={() => setActiveTab('payment')}
-              className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${
-                activeTab === 'payment'
+              className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${activeTab === 'payment'
                   ? 'border-brand-600 text-brand-600'
                   : 'border-transparent text-slate-500 hover:text-slate-900'
-              }`}
+                }`}
             >
               <CreditCard className="h-4 w-4" /> Payment
             </button>
             <button
               onClick={() => setActiveTab('shipping')}
-              className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${
-                activeTab === 'shipping'
+              className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${activeTab === 'shipping'
                   ? 'border-brand-600 text-brand-600'
                   : 'border-transparent text-slate-500 hover:text-slate-900'
-              }`}
+                }`}
             >
               <Truck className="h-4 w-4" /> Courier & Shipping
             </button>
             <button
-              onClick={() => setActiveTab('about')}
-              className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${
-                activeTab === 'about'
+              onClick={() => setActiveTab('tracking')}
+              className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${activeTab === 'tracking'
                   ? 'border-brand-600 text-brand-600'
                   : 'border-transparent text-slate-500 hover:text-slate-900'
-              }`}
+                }`}
             >
-              <Info className="h-4 w-4" /> About & Contact Info
+              <Share2 className="h-4 w-4" /> Ads & Social
+            </button>
+            <button
+              onClick={() => setActiveTab('about')}
+              className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${activeTab === 'about'
+                  ? 'border-brand-600 text-brand-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                }`}
+            >
+              <Info className="h-4 w-4" /> About & Contact
             </button>
           </div>
 
@@ -171,7 +195,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
           {activeTab === 'branding' && (
             <div className="bg-white rounded-b-lg border border-t-0 border-slate-200 p-6 space-y-8 shadow-sm">
               <div className="max-w-2xl space-y-6">
-                
+
                 {/* Store Name & Tagline */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -231,6 +255,29 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                   </div>
                 </div>
 
+                {/* Optional Watermark Toggle */}
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 block">Product Photo Logo Watermark</span>
+                    <span className="text-[11px] text-slate-500 block mt-0.5">
+                      Automatically stamp your store logo watermark in the bottom-right corner of new product photos upon upload.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={settings.watermark_enabled}
+                    onClick={() => setSettings({ ...settings, watermark_enabled: !settings.watermark_enabled })}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.watermark_enabled ? 'bg-brand-600' : 'bg-slate-300'
+                      }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.watermark_enabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                    />
+                  </button>
+                </div>
+
                 {/* 8 Curated Theme Color Palettes */}
                 <div className="pt-6 border-t border-slate-100 space-y-3">
                   <div>
@@ -248,11 +295,10 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                         key={palette.id}
                         type="button"
                         onClick={() => setSettings({ ...settings, theme_color: palette.id })}
-                        className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition ${
-                          settings.theme_color === palette.id
+                        className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition ${settings.theme_color === palette.id
                             ? 'border-slate-900 bg-slate-50 shadow-sm ring-2 ring-slate-900/10'
                             : 'border-slate-200 hover:border-slate-300'
-                        }`}
+                          }`}
                       >
                         <span
                           className="h-6 w-6 rounded-full flex-shrink-0 shadow-inner border border-black/10"
@@ -275,7 +321,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
           {activeTab === 'hero' && (
             <div className="bg-white rounded-b-lg border border-t-0 border-slate-200 p-6 space-y-8 shadow-sm">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                
+
                 {/* Inputs (Left 7 Cols) */}
                 <div className="lg:col-span-7 space-y-5">
                   <div>
@@ -351,14 +397,14 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5 text-brand-600" /> Live Hero Preview
                   </span>
-                  
+
                   <div className="relative overflow-hidden rounded-xl bg-slate-950 text-white p-6 shadow-xl aspect-[4/3] flex flex-col justify-end border border-slate-800">
-                    <div 
+                    <div
                       className="absolute inset-0 bg-cover bg-center opacity-40"
                       style={{ backgroundImage: `url(${settings.hero_image_url || 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=1600'})` }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" />
-                    
+
                     <div className="relative z-10 space-y-2">
                       {settings.hero_badge_text && (
                         <span className="inline-block rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30 px-2.5 py-0.5 text-[10px] font-bold">
@@ -384,7 +430,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
           {activeTab === 'collections' && (
             <div className="bg-white rounded-b-lg border border-t-0 border-slate-200 p-4 sm:p-6 shadow-sm">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-                
+
                 {/* LEFT COLUMN: TOGGLES & AUTOMATION RULES */}
                 <div className="lg:col-span-7 space-y-6">
                   <div>
@@ -395,11 +441,10 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                   </div>
 
                   <div className="space-y-4">
-                    
+
                     {/* COLLECTION 1: FEATURED */}
-                    <div className={`rounded-xl border p-4 space-y-3 transition-all ${
-                      settings.show_featured ? 'border-amber-200 bg-amber-50/20' : 'border-slate-200 bg-slate-50/50 opacity-80'
-                    }`}>
+                    <div className={`rounded-xl border p-4 space-y-3 transition-all ${settings.show_featured ? 'border-amber-200 bg-amber-50/20' : 'border-slate-200 bg-slate-50/50 opacity-80'
+                      }`}>
                       <div className="flex items-center justify-between">
                         <div>
                           <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
@@ -409,20 +454,18 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                             Display a dedicated Featured row on the homepage and a Featured link in the navbar.
                           </span>
                         </div>
-                        
+
                         <button
                           type="button"
                           role="switch"
                           aria-checked={settings.show_featured}
                           onClick={() => setSettings({ ...settings, show_featured: !settings.show_featured })}
-                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                            settings.show_featured ? 'bg-brand-600' : 'bg-slate-300'
-                          }`}
+                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.show_featured ? 'bg-brand-600' : 'bg-slate-300'
+                            }`}
                         >
                           <span
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              settings.show_featured ? 'translate-x-5' : 'translate-x-0'
-                            }`}
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.show_featured ? 'translate-x-5' : 'translate-x-0'
+                              }`}
                           />
                         </button>
                       </div>
@@ -432,9 +475,8 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                     </div>
 
                     {/* COLLECTION 2: BEST SELLER */}
-                    <div className={`rounded-xl border p-4 space-y-4 transition-all ${
-                      settings.show_best_seller ? 'border-blue-200 bg-blue-50/20' : 'border-slate-200 bg-slate-50/50 opacity-80'
-                    }`}>
+                    <div className={`rounded-xl border p-4 space-y-4 transition-all ${settings.show_best_seller ? 'border-blue-200 bg-blue-50/20' : 'border-slate-200 bg-slate-50/50 opacity-80'
+                      }`}>
                       <div className="flex items-center justify-between">
                         <div>
                           <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
@@ -444,20 +486,18 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                             Display a Best Seller showcase row on the homepage and in the storefront navigation.
                           </span>
                         </div>
-                        
+
                         <button
                           type="button"
                           role="switch"
                           aria-checked={settings.show_best_seller}
                           onClick={() => setSettings({ ...settings, show_best_seller: !settings.show_best_seller })}
-                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                            settings.show_best_seller ? 'bg-brand-600' : 'bg-slate-300'
-                          }`}
+                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.show_best_seller ? 'bg-brand-600' : 'bg-slate-300'
+                            }`}
                         >
                           <span
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              settings.show_best_seller ? 'translate-x-5' : 'translate-x-0'
-                            }`}
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.show_best_seller ? 'translate-x-5' : 'translate-x-0'
+                              }`}
                           />
                         </button>
                       </div>
@@ -478,14 +518,12 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                               role="switch"
                               aria-checked={settings.auto_best_seller}
                               onClick={() => setSettings({ ...settings, auto_best_seller: !settings.auto_best_seller })}
-                              className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                settings.auto_best_seller ? 'bg-brand-600' : 'bg-slate-300'
-                              }`}
+                              className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.auto_best_seller ? 'bg-brand-600' : 'bg-slate-300'
+                                }`}
                             >
                               <span
-                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                  settings.auto_best_seller ? 'translate-x-4' : 'translate-x-0'
-                                }`}
+                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.auto_best_seller ? 'translate-x-4' : 'translate-x-0'
+                                  }`}
                               />
                             </button>
                           </div>
@@ -494,9 +532,8 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                     </div>
 
                     {/* COLLECTION 3: TRENDING */}
-                    <div className={`rounded-xl border p-4 space-y-4 transition-all ${
-                      settings.show_trending ? 'border-purple-200 bg-purple-50/20' : 'border-slate-200 bg-slate-50/50 opacity-80'
-                    }`}>
+                    <div className={`rounded-xl border p-4 space-y-4 transition-all ${settings.show_trending ? 'border-purple-200 bg-purple-50/20' : 'border-slate-200 bg-slate-50/50 opacity-80'
+                      }`}>
                       <div className="flex items-center justify-between">
                         <div>
                           <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
@@ -506,20 +543,18 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                             Display a Trending showcase row on the homepage and in the storefront navigation.
                           </span>
                         </div>
-                        
+
                         <button
                           type="button"
                           role="switch"
                           aria-checked={settings.show_trending}
                           onClick={() => setSettings({ ...settings, show_trending: !settings.show_trending })}
-                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                            settings.show_trending ? 'bg-brand-600' : 'bg-slate-300'
-                          }`}
+                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.show_trending ? 'bg-brand-600' : 'bg-slate-300'
+                            }`}
                         >
                           <span
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              settings.show_trending ? 'translate-x-5' : 'translate-x-0'
-                            }`}
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.show_trending ? 'translate-x-5' : 'translate-x-0'
+                              }`}
                           />
                         </button>
                       </div>
@@ -540,14 +575,12 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                               role="switch"
                               aria-checked={settings.auto_trending}
                               onClick={() => setSettings({ ...settings, auto_trending: !settings.auto_trending })}
-                              className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                settings.auto_trending ? 'bg-brand-600' : 'bg-slate-300'
-                              }`}
+                              className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.auto_trending ? 'bg-brand-600' : 'bg-slate-300'
+                                }`}
                             >
                               <span
-                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                  settings.auto_trending ? 'translate-x-4' : 'translate-x-0'
-                                }`}
+                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.auto_trending ? 'translate-x-4' : 'translate-x-0'
+                                  }`}
                               />
                             </button>
                           </div>
@@ -571,7 +604,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
 
                   {/* MINI STOREFRONT WIREFRAME */}
                   <div className="rounded-2xl border border-slate-300/80 bg-slate-900 p-3.5 space-y-3 shadow-inner text-white font-sans text-xs">
-                    
+
                     {/* 1. Mini Navbar */}
                     <div className="rounded-xl bg-slate-800/90 border border-slate-700/80 p-2.5 flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
@@ -706,7 +739,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
           {activeTab === 'payment' && (
             <div className="bg-white rounded-b-lg border border-t-0 border-slate-200 p-6 space-y-8 shadow-sm">
               <div className="max-w-2xl space-y-6">
-                
+
                 <div>
                   <h2 className="text-sm font-bold text-slate-900">Payment Methods & Checkout Rules</h2>
                   <p className="text-xs text-slate-500 mt-0.5">
@@ -716,7 +749,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
 
                 {/* PAYMENT METHOD TOGGLES */}
                 <div className="space-y-4">
-                  
+
                   {/* OPTION 1: CASH ON DELIVERY (COD) */}
                   <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-4">
                     <div className="flex items-center justify-between">
@@ -726,7 +759,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                           Allow customers to place orders with payment due upon parcel arrival.
                         </span>
                       </div>
-                      
+
                       {/* Switch Toggle */}
                       <button
                         type="button"
@@ -736,14 +769,12 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                           const nextVal = !settings.cod_enabled
                           setSettings({ ...settings, cod_enabled: nextVal })
                         }}
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                          settings.cod_enabled ? 'bg-brand-600' : 'bg-slate-300'
-                        }`}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.cod_enabled ? 'bg-brand-600' : 'bg-slate-300'
+                          }`}
                       >
                         <span
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            settings.cod_enabled ? 'translate-x-5' : 'translate-x-0'
-                          }`}
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.cod_enabled ? 'translate-x-5' : 'translate-x-0'
+                            }`}
                         />
                       </button>
                     </div>
@@ -767,21 +798,30 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                             aria-checked={settings.cod_prepay_delivery}
                             onClick={() => {
                               const nextPrepay = !settings.cod_prepay_delivery
-                              setSettings({
-                                ...settings,
-                                cod_prepay_delivery: nextPrepay,
-                                // If prepayment is turned ON, bKash must automatically be enabled
-                                ...(nextPrepay ? { bkash_enabled: true } : {})
-                              })
+                              if (nextPrepay) {
+                                // Check if at least one bKash method is active and configured
+                                const hasBkash = settings.bkash_enabled || (settings.bkash_personal_enabled && settings.bkash_personal_number?.trim().length >= 11)
+                                if (!hasBkash) {
+                                  setBkashWarningModal(true)
+                                  return
+                                }
+                                setSettings({
+                                  ...settings,
+                                  cod_prepay_delivery: true
+                                })
+                              } else {
+                                setSettings({
+                                  ...settings,
+                                  cod_prepay_delivery: false
+                                })
+                              }
                             }}
-                            className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                              settings.cod_prepay_delivery ? 'bg-brand-600' : 'bg-slate-300'
-                            }`}
+                            className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.cod_prepay_delivery ? 'bg-brand-600' : 'bg-slate-300'
+                              }`}
                           >
                             <span
-                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                settings.cod_prepay_delivery ? 'translate-x-4' : 'translate-x-0'
-                              }`}
+                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.cod_prepay_delivery ? 'translate-x-4' : 'translate-x-0'
+                                }`}
                             />
                           </button>
                         </div>
@@ -789,14 +829,18 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                         {settings.cod_prepay_delivery && (
                           <div className="text-[11px] font-semibold text-brand-700 bg-brand-50 p-2.5 rounded-lg border border-brand-100 flex items-center gap-2">
                             <Sparkles className="h-4 w-4 flex-shrink-0 text-brand-600" />
-                            <span>bKash Gateway is automatically active to process advance delivery charge payments.</span>
+                            <span>
+                              {settings.bkash_enabled
+                                ? 'bKash Merchant Gateway will collect the advance delivery charge online.'
+                                : 'bKash Personal is active. Customers will be prompted to Send Money for the advance delivery charge at checkout.'}
+                            </span>
                           </div>
                         )}
                       </div>
                     )}
                   </div>
 
-                  {/* OPTION 2: BKASH ONLINE PAYMENT */}
+                  {/* OPTION 2: BKASH ONLINE PAYMENT GATEWAY */}
                   <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -809,114 +853,179 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                       <button
                         type="button"
                         role="switch"
-                        aria-checked={settings.bkash_enabled || (settings.cod_enabled && settings.cod_prepay_delivery)}
-                        disabled={settings.cod_enabled && settings.cod_prepay_delivery}
+                        aria-checked={settings.bkash_enabled}
                         onClick={() => {
-                          if (settings.cod_enabled && settings.cod_prepay_delivery) return
-                          setSettings({ ...settings, bkash_enabled: !settings.bkash_enabled })
+                          const nextBkash = !settings.bkash_enabled
+                          setSettings({ ...settings, bkash_enabled: nextBkash })
                         }}
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-75 ${
-                          settings.bkash_enabled || (settings.cod_enabled && settings.cod_prepay_delivery) ? 'bg-brand-600' : 'bg-slate-300'
-                        }`}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.bkash_enabled ? 'bg-brand-600' : 'bg-slate-300'
+                          }`}
                       >
                         <span
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            settings.bkash_enabled || (settings.cod_enabled && settings.cod_prepay_delivery) ? 'translate-x-5' : 'translate-x-0'
-                          }`}
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.bkash_enabled ? 'translate-x-5' : 'translate-x-0'
+                            }`}
                         />
                       </button>
                     </div>
 
-                    {settings.cod_enabled && settings.cod_prepay_delivery && (
-                      <p className="text-[10px] text-slate-400 font-medium">
-                        * bKash is kept ON because Advance Delivery Prepayment is required for Cash on Delivery.
-                      </p>
+                    {/* BKASH MERCHANT CONFIGURATION (Directly inside Option 2 under toggle) */}
+                    {settings.bkash_enabled && (
+                      <div className="pt-4 border-t border-slate-200 space-y-4">
+                        {/* Merchant Notice Warning Banner */}
+                        <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-900 space-y-1">
+                          <div className="flex items-center gap-2 font-bold text-amber-950">
+                            <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                            <span>bKash Merchant Account Requirement</span>
+                          </div>
+                          <p className="text-amber-800 text-[11px] leading-relaxed pl-6">
+                            Only official <strong>bKash Merchant Accounts</strong> with Tokenized Checkout API credentials are used for automatic payment gateway checkout. If you do not have a merchant account, use <strong>bKash Personal (Send Money)</strong> below instead!
+                          </p>
+                        </div>
+
+                        <div>
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                            bKash Tokenized Checkout API Credentials
+                          </h3>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Provided in your official bKash Merchant Onboarding / Developer Portal email.
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                            bKash API Endpoint URL
+                          </label>
+                          <input
+                            type="text"
+                            value={settings.bkash_api_url}
+                            onChange={(e) => setSettings({ ...settings, bkash_api_url: e.target.value })}
+                            placeholder="https://tokenized.sandbox.bka.sh/v1.2.0-beta or https://tokenized.pay.bka.sh/v1.2.0-beta"
+                            className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono bg-white"
+                          />
+                          <span className="text-[10px] text-slate-400 mt-1 block">
+                            Sandbox: <code className="text-brand-600">https://tokenized.sandbox.bka.sh/v1.2.0-beta</code> • Live: <code className="text-brand-600">https://tokenized.pay.bka.sh/v1.2.0-beta</code>
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">App Key *</label>
+                            <input
+                              type="password"
+                              value={settings.bkash_app_key}
+                              onChange={(e) => setSettings({ ...settings, bkash_app_key: e.target.value })}
+                              className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">App Secret *</label>
+                            <input
+                              type="password"
+                              value={settings.bkash_app_secret}
+                              onChange={(e) => setSettings({ ...settings, bkash_app_secret: e.target.value })}
+                              className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Merchant Username *</label>
+                            <input
+                              type="text"
+                              value={settings.bkash_username}
+                              onChange={(e) => setSettings({ ...settings, bkash_username: e.target.value })}
+                              className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Password *</label>
+                            <input
+                              type="password"
+                              value={settings.bkash_password}
+                              onChange={(e) => setSettings({ ...settings, bkash_password: e.target.value })}
+                              className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono bg-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* OPTION 3: BKASH PERSONAL (SEND MONEY & QR) */}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-slate-900 block">bKash Personal (Send Money & QR Code)</span>
+                        <span className="text-[11px] text-slate-500 block mt-0.5">
+                          For small shops without a merchant account. Customers send money directly to your personal bKash number or scan your QR code at checkout.
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={settings.bkash_personal_enabled}
+                        onClick={() => setSettings({ ...settings, bkash_personal_enabled: !settings.bkash_personal_enabled })}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.bkash_personal_enabled ? 'bg-pink-600' : 'bg-slate-300'
+                          }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.bkash_personal_enabled ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                        />
+                      </button>
+                    </div>
+
+                    {settings.bkash_personal_enabled && (
+                      <div className="pt-4 border-t border-slate-200 space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                              Personal bKash Number *
+                            </label>
+                            <input
+                              type="text"
+                              value={settings.bkash_personal_number || ''}
+                              onChange={(e) => setSettings({ ...settings, bkash_personal_number: e.target.value })}
+                              placeholder="e.g. 01712345678"
+                              className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono bg-white"
+                            />
+                            <span className="text-[10px] text-slate-400 mt-1 block">
+                              Customers will see this number and be instructed to Send Money.
+                            </span>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                              Account Holder Name (Optional)
+                            </label>
+                            <input
+                              type="text"
+                              value={settings.bkash_personal_name || ''}
+                              onChange={(e) => setSettings({ ...settings, bkash_personal_name: e.target.value })}
+                              placeholder="e.g. Sadman Sakib"
+                              className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                            bKash QR Code Image (Optional)
+                          </label>
+                          <p className="text-[11px] text-slate-500 mb-2">
+                            Upload a screenshot of your personal bKash QR code from your bKash app. Customers can scan it to send money instantly.
+                          </p>
+                          <ImageUploader
+                            value={settings.bkash_personal_qr_url ? [settings.bkash_personal_qr_url] : []}
+                            onChange={(urls) => setSettings({ ...settings, bkash_personal_qr_url: Array.isArray(urls) ? urls[0] || '' : urls || '' })}
+                            single={true}
+                            maxImages={1}
+                          />
+                        </div>
+                      </div>
                     )}
                   </div>
 
                 </div>
-
-                {/* BKASH CONFIGURATION SECTION (Only render when bKash or advance delivery prepayment is active) */}
-                {(settings.bkash_enabled || (settings.cod_enabled && settings.cod_prepay_delivery)) && (
-                  <div className="pt-6 border-t border-slate-200 space-y-5">
-                    
-                    {/* Merchant Notice Warning Banner */}
-                    <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-xs text-amber-900 space-y-1">
-                      <div className="flex items-center gap-2 font-bold text-amber-950">
-                        <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                        <span>bKash Merchant Account Requirement</span>
-                      </div>
-                      <p className="text-amber-800 text-[11px] leading-relaxed pl-6">
-                        Only official <strong>bKash Merchant Accounts</strong> with Tokenized Checkout API credentials are allowed for online payment gateway integration. Personal bKash numbers, agent SIMs, and manual &quot;Send Money&quot; numbers cannot be used here.
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                        bKash Tokenized Checkout API Credentials
-                      </h3>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        Provided in your official bKash Merchant Onboarding / Developer Portal email.
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        bKash API Endpoint URL
-                      </label>
-                      <input
-                        type="text"
-                        value={settings.bkash_api_url}
-                        onChange={(e) => setSettings({ ...settings, bkash_api_url: e.target.value })}
-                        placeholder="https://tokenized.sandbox.bka.sh/v1.2.0-beta or https://tokenized.pay.bka.sh/v1.2.0-beta"
-                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono"
-                      />
-                      <span className="text-[10px] text-slate-400 mt-1 block">
-                        Sandbox: <code className="text-brand-600">https://tokenized.sandbox.bka.sh/v1.2.0-beta</code> • Live: <code className="text-brand-600">https://tokenized.pay.bka.sh/v1.2.0-beta</code>
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase mb-1">App Key *</label>
-                        <input
-                          type="password"
-                          value={settings.bkash_app_key}
-                          onChange={(e) => setSettings({ ...settings, bkash_app_key: e.target.value })}
-                          className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase mb-1">App Secret *</label>
-                        <input
-                          type="password"
-                          value={settings.bkash_app_secret}
-                          onChange={(e) => setSettings({ ...settings, bkash_app_secret: e.target.value })}
-                          className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Merchant Username *</label>
-                        <input
-                          type="text"
-                          value={settings.bkash_username}
-                          onChange={(e) => setSettings({ ...settings, bkash_username: e.target.value })}
-                          className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Password *</label>
-                        <input
-                          type="password"
-                          value={settings.bkash_password}
-                          onChange={(e) => setSettings({ ...settings, bkash_password: e.target.value })}
-                          className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono"
-                        />
-                      </div>
-                    </div>
-
-                  </div>
-                )}
 
               </div>
             </div>
@@ -937,35 +1046,81 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                 <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
                   <div>
                     <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                      Standard Shipping Fees
+                      Flexible Shipping Zones & Base Delivery Charges
                     </h3>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      Base delivery charges calculated at checkout based on the customer's delivery destination.
+                      Configure your shop's primary city and customized zone names. Checkout will automatically match the customer's city and calculate the correct fee.
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        Delivery Charge: Inside Dhaka (৳)
-                      </label>
-                      <input
-                        type="number"
-                        value={settings.delivery_charge_inside_dhaka}
-                        onChange={(e) => setSettings({ ...settings, delivery_charge_inside_dhaka: Number(e.target.value) })}
-                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
-                      />
+                  {/* Store Primary City */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Store Base / Origin City
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.store_city_name || 'Dhaka'}
+                      onChange={(e) => setSettings({ ...settings, store_city_name: e.target.value })}
+                      placeholder="e.g. Dhaka, Chittagong, Sylhet, Khulna, Rajshahi"
+                      className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Orders destined for this city will receive the Zone 1 (Local) rate.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-200/80">
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                          Zone 1 (Local Area) Label
+                        </label>
+                        <input
+                          type="text"
+                          value={settings.shipping_zone_1_label || 'Inside Dhaka'}
+                          onChange={(e) => setSettings({ ...settings, shipping_zone_1_label: e.target.value })}
+                          placeholder="e.g. Inside Dhaka"
+                          className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                          Zone 1 Delivery Fee (৳)
+                        </label>
+                        <input
+                          type="number"
+                          value={settings.delivery_charge_inside_dhaka}
+                          onChange={(e) => setSettings({ ...settings, delivery_charge_inside_dhaka: Number(e.target.value) })}
+                          className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-bold"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        Delivery Charge: Outside Dhaka (৳)
-                      </label>
-                      <input
-                        type="number"
-                        value={settings.delivery_charge_outside_dhaka}
-                        onChange={(e) => setSettings({ ...settings, delivery_charge_outside_dhaka: Number(e.target.value) })}
-                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
-                      />
+
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                          Zone 2 (Nationwide / Out of City) Label
+                        </label>
+                        <input
+                          type="text"
+                          value={settings.shipping_zone_2_label || 'Outside Dhaka'}
+                          onChange={(e) => setSettings({ ...settings, shipping_zone_2_label: e.target.value })}
+                          placeholder="e.g. Outside Dhaka"
+                          className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                          Zone 2 Delivery Fee (৳)
+                        </label>
+                        <input
+                          type="number"
+                          value={settings.delivery_charge_outside_dhaka}
+                          onChange={(e) => setSettings({ ...settings, delivery_charge_outside_dhaka: Number(e.target.value) })}
+                          className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-bold"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -978,7 +1133,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                     </h3>
                     <span className="text-[11px] text-slate-400">Optional API Booking</span>
                   </div>
-                  
+
                   {/* PATHAO TOGGLE */}
                   <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
                     <div className="flex items-center justify-between">
@@ -988,7 +1143,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                           Enables Pathao Aladdin API automated parcel booking & cascading City → Zone → Area selector at checkout.
                         </span>
                       </div>
-                      
+
                       <button
                         type="button"
                         role="switch"
@@ -997,14 +1152,12 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                           const nextVal = !settings.pathao_enabled
                           setSettings({ ...settings, pathao_enabled: nextVal })
                         }}
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                          settings.pathao_enabled ? 'bg-brand-600' : 'bg-slate-300'
-                        }`}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.pathao_enabled ? 'bg-brand-600' : 'bg-slate-300'
+                          }`}
                       >
                         <span
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            settings.pathao_enabled ? 'translate-x-5' : 'translate-x-0'
-                          }`}
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.pathao_enabled ? 'translate-x-5' : 'translate-x-0'
+                            }`}
                         />
                       </button>
                     </div>
@@ -1076,7 +1229,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                           Enables Steadfast Courier automated parcel dispatch with simplified direct address checkout.
                         </span>
                       </div>
-                      
+
                       <button
                         type="button"
                         role="switch"
@@ -1085,14 +1238,12 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                           const nextVal = !settings.steadfast_enabled
                           setSettings({ ...settings, steadfast_enabled: nextVal })
                         }}
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                          settings.steadfast_enabled ? 'bg-brand-600' : 'bg-slate-300'
-                        }`}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.steadfast_enabled ? 'bg-brand-600' : 'bg-slate-300'
+                          }`}
                       >
                         <span
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            settings.steadfast_enabled ? 'translate-x-5' : 'translate-x-0'
-                          }`}
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.steadfast_enabled ? 'translate-x-5' : 'translate-x-0'
+                            }`}
                         />
                       </button>
                     </div>
@@ -1152,7 +1303,7 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
           {activeTab === 'about' && (
             <div className="bg-white rounded-b-lg border border-t-0 border-slate-200 p-6 space-y-6 shadow-sm">
               <div className="max-w-2xl space-y-6">
-                
+
                 <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50/50">
                   <div>
                     <h3 className="text-xs font-bold text-slate-900 uppercase">Enable About Page</h3>
@@ -1160,22 +1311,20 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                       Toggle whether the public <code>/about</code> page and navigation links are active for your store.
                     </p>
                   </div>
-                  
+
                   {/* Modern Switch Toggle */}
                   <button
                     type="button"
                     role="switch"
                     aria-checked={settings.about_enabled}
                     onClick={() => setSettings({ ...settings, about_enabled: !settings.about_enabled })}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      settings.about_enabled ? 'bg-brand-600' : 'bg-slate-300'
-                    }`}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings.about_enabled ? 'bg-brand-600' : 'bg-slate-300'
+                      }`}
                   >
                     <span
                       aria-hidden="true"
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                        settings.about_enabled ? 'translate-x-5' : 'translate-x-0'
-                      }`}
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${settings.about_enabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
                     />
                   </button>
                 </div>
@@ -1429,8 +1578,389 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
             </div>
           )}
 
+          {/* TAB: ADS & TRACKING PIXELS */}
+          {activeTab === 'tracking' && (
+            <div className="bg-white rounded-b-lg border border-t-0 border-slate-200 p-6 space-y-8 shadow-sm">
+              <div className="max-w-2xl space-y-6">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">Marketing, Ads Tracking Pixels & Social Channels</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Connect your Facebook & Instagram Meta Pixel, Google Analytics 4, TikTok Pixel, and official social media accounts.
+                  </p>
+                </div>
+
+                {/* 1. AD PIXEL INTEGRATIONS */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+                    <Sparkles className="h-4 w-4 text-brand-600" />
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                      Advertising & Analytics Pixels
+                    </h3>
+                  </div>
+
+                  {/* Meta (Facebook / Instagram) Pixel */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase flex items-center justify-between">
+                      <span>Meta Pixel ID (Facebook / Instagram Ads)</span>
+                      <span className="text-[10px] font-normal text-slate-400">e.g. 123456789012345</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.meta_pixel_id || ''}
+                      onChange={(e) => setSettings({ ...settings, meta_pixel_id: e.target.value })}
+                      placeholder="Paste your 15-16 digit Meta Pixel ID"
+                      className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                    />
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Find this in your <strong>Meta Events Manager</strong>. The pixel script will automatically inject into all storefront pages and track page views.
+                    </p>
+                  </div>
+
+                  {/* Google Analytics 4 (GA4) */}
+                  <div className="space-y-1.5 pt-2 border-t border-slate-200/60">
+                    <label className="block text-xs font-bold text-slate-700 uppercase flex items-center justify-between">
+                      <span>Google Analytics 4 Measurement ID</span>
+                      <span className="text-[10px] font-normal text-slate-400">e.g. G-XXXXXXXXXX</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.google_analytics_id || ''}
+                      onChange={(e) => setSettings({ ...settings, google_analytics_id: e.target.value })}
+                      placeholder="G-XXXXXXXXXX"
+                      className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                    />
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Find this in Google Analytics under <strong>Admin &gt; Data Streams &gt; Measurement ID</strong>.
+                    </p>
+                  </div>
+
+                  {/* TikTok Pixel */}
+                  <div className="space-y-1.5 pt-2 border-t border-slate-200/60">
+                    <label className="block text-xs font-bold text-slate-700 uppercase flex items-center justify-between">
+                      <span>TikTok Pixel ID</span>
+                      <span className="text-[10px] font-normal text-slate-400">e.g. CXXXXXXXXXXXXXXX</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.tiktok_pixel_id || ''}
+                      onChange={(e) => setSettings({ ...settings, tiktok_pixel_id: e.target.value })}
+                      placeholder="TikTok Pixel ID from TikTok Ads Manager"
+                      className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                    />
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Find this in TikTok Ads Manager under <strong>Assets &gt; Events &gt; Web Events</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. SOCIAL MEDIA LINKS */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+                    <Share2 className="h-4 w-4 text-brand-600" />
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                      Store Social Media Profiles
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Facebook */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        Facebook Page URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_facebook || ''}
+                        onChange={(e) => setSettings({ ...settings, social_facebook: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_facebook: formatExternalUrl(e.target.value) })}
+                        placeholder="https://facebook.com/yourpage"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+
+                    {/* Instagram */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        Instagram Profile URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_instagram || ''}
+                        onChange={(e) => setSettings({ ...settings, social_instagram: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_instagram: formatExternalUrl(e.target.value) })}
+                        placeholder="https://instagram.com/yourhandle"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+
+                    {/* YouTube */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        YouTube Channel URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_youtube || ''}
+                        onChange={(e) => setSettings({ ...settings, social_youtube: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_youtube: formatExternalUrl(e.target.value) })}
+                        placeholder="https://youtube.com/@yourchannel"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+
+                    {/* TikTok */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        TikTok Profile URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_tiktok || ''}
+                        onChange={(e) => setSettings({ ...settings, social_tiktok: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_tiktok: formatExternalUrl(e.target.value) })}
+                        placeholder="https://tiktok.com/@yourhandle"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+
+                    {/* Twitter / X */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        X (Twitter) Profile URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_twitter || ''}
+                        onChange={(e) => setSettings({ ...settings, social_twitter: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_twitter: formatExternalUrl(e.target.value) })}
+                        placeholder="https://x.com/yourhandle"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+
+                    {/* LinkedIn */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        LinkedIn Page URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_linkedin || ''}
+                        onChange={(e) => setSettings({ ...settings, social_linkedin: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_linkedin: formatExternalUrl(e.target.value) })}
+                        placeholder="https://linkedin.com/company/yourcompany"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. RESEND EMAIL SERVICE INTEGRATION */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+                    <Mail className="h-4 w-4 text-brand-600" />
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                      Email Service Integration (Resend)
+                    </h3>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Resend API Key
+                    </label>
+                    <input
+                      type="password"
+                      value={settings.resend_api_key || ''}
+                      onChange={(e) => setSettings({ ...settings, resend_api_key: e.target.value })}
+                      placeholder="re_123456789..."
+                      className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                    />
+                    <p className="text-[11px] text-slate-500 leading-relaxed mt-1">
+                      Used for automated customer invoices, order confirmations, and promotional email broadcasts. Free 100 emails/day at <a href="https://resend.com" target="_blank" rel="noreferrer" className="text-brand-600 underline">resend.com</a>.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      From Email Address (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.resend_from_email || ''}
+                      onChange={(e) => setSettings({ ...settings, resend_from_email: e.target.value })}
+                      placeholder="e.g. orders@yourdomain.com (default: onboarding@resend.dev)"
+                      className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                      Leave blank to use the default sandbox (<code className="text-brand-600">onboarding@resend.dev</code>). If you added a custom domain in Resend, enter your domain's email here.
+                    </p>
+                  </div>
+
+                  {/* AUTOMATED INVOICE EMAILS TOGGLE */}
+                  <div className="pt-3 border-t border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">
+                          Automated Customer Invoices
+                        </h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Automatically send an order confirmation & itemized invoice email to customers upon checkout.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSettings({ ...settings, email_invoice_enabled: settings.email_invoice_enabled === false })}
+                        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          settings.email_invoice_enabled !== false ? 'bg-brand-600' : 'bg-slate-200'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            settings.email_invoice_enabled !== false ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* DAILY PENDING ORDERS SUMMARY DIGEST */}
+                  <div className="pt-3 border-t border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5 text-brand-600" />
+                          <h4 className="text-xs font-bold text-slate-900">
+                            Daily Pending Orders Summary
+                          </h4>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Send a daily executive email digest of all unfulfilled/pending orders directly to the store owner.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSettings({ ...settings, daily_digest_enabled: !settings.daily_digest_enabled })}
+                        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          settings.daily_digest_enabled ? 'bg-brand-600' : 'bg-slate-200'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            settings.daily_digest_enabled ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {settings.daily_digest_enabled && (
+                      <div className="p-3.5 rounded-xl border border-brand-200/80 bg-brand-50/30 space-y-3 mt-2 animate-fadeIn">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                              Daily Delivery Time (BST / Dhaka)
+                            </label>
+                            <select
+                              value={settings.daily_digest_time || '20:00'}
+                              onChange={(e) => setSettings({ ...settings, daily_digest_time: e.target.value })}
+                              className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                            >
+                              <option value="08:00">08:00 AM (Morning Kickoff)</option>
+                              <option value="09:00">09:00 AM</option>
+                              <option value="10:00">10:00 AM</option>
+                              <option value="12:00">12:00 PM (Noon)</option>
+                              <option value="15:00">03:00 PM</option>
+                              <option value="18:00">06:00 PM (Evening)</option>
+                              <option value="20:00">08:00 PM (Night Summary - Default)</option>
+                              <option value="21:00">09:00 PM</option>
+                              <option value="22:00">10:00 PM</option>
+                              <option value="23:00">11:00 PM</option>
+                            </select>
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              Scheduled via Vercel Cron in Bangladesh Time (UTC+6).
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                              Owner Recipient Email
+                            </label>
+                            <input
+                              type="email"
+                              value={settings.daily_digest_email || ''}
+                              onChange={(e) => setSettings({ ...settings, daily_digest_email: e.target.value })}
+                              placeholder={settings.contact_email ? `Defaults to: ${settings.contact_email}` : 'owner@yourcompany.com'}
+                              className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                            />
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              Leave empty to send to store contact email ({settings.contact_email || 'not set'}).
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 flex items-center justify-between border-t border-brand-200/50">
+                          <span className="text-[11px] text-slate-600">
+                            Want to test the summary email right now?
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleSendTestDailyDigest}
+                            disabled={testDigestLoading}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition disabled:opacity-50"
+                          >
+                            {testDigestLoading ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <span>Sending...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Send className="h-3.5 w-3.5" />
+                                <span>Send Test Summary Now</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
+
         </main>
       </div>
+
+      {/* BKASH SETUP REQUIREMENT POPUP MODAL */}
+      {bkashWarningModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl p-6 sm:p-8 max-w-md w-full text-center space-y-4 animate-scale-up">
+            <div className="h-14 w-14 rounded-full bg-pink-50 text-pink-600 flex items-center justify-center mx-auto border border-pink-200">
+              <Smartphone className="h-7 w-7" />
+            </div>
+
+            <h3 className="text-base font-black text-slate-950">
+              Set Up bKash First
+            </h3>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              To require advance delivery charge prepayment from customers, you must first enable and set up either <strong>bKash Personal (Send Money)</strong> or <strong>bKash Online Payment Gateway</strong> in the payment section below.
+            </p>
+
+            <div className="pt-2 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setBkashWarningModal(false)}
+                className="w-full sm:w-auto min-w-[120px] py-2.5 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

@@ -5,10 +5,12 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { useStore } from '@/context/StoreContext'
-import { hasFullAccess, getRoleDetails } from '@/utils/staff'
+import { useLanguage } from '@/context/LanguageContext'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
+import { hasFullAccess, getRoleDetails, normalizeStaffRole } from '@/utils/staff'
 import { 
   BarChart3, ShoppingBag, Package, LogOut, MessageSquare, 
-  Settings, FolderTree, ShieldCheck, Menu, X, ExternalLink, Users
+  Settings, FolderTree, ShieldCheck, Menu, X, ExternalLink, Users, Megaphone
 } from 'lucide-react'
 import axios from 'axios'
 
@@ -23,6 +25,7 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
   const searchParams = useSearchParams()
   const supabase = createClient()
   const { settings } = useStore()
+  const { t, isBangla } = useLanguage()
   
   const [unreadCount, setUnreadCount] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -37,22 +40,25 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
         const { data: { user } } = await supabase.auth.getUser()
         if (user && user.email) {
           setUserEmail(user.email)
-          const cleanEmail = user.email.toLowerCase()
+          const cleanEmail = user.email.toLowerCase().trim()
+          const metaRole = normalizeStaffRole(user.user_metadata?.role)
           
-          const { data: staffMember } = await supabase
+          const { data: staffMembers } = await supabase
             .from('staff_members')
             .select('*')
-            .eq('email', cleanEmail)
-            .single()
+            .or(`user_id.eq.${user.id},email.ilike.${cleanEmail}`)
+            .limit(1)
+
+          const staffMember = staffMembers && staffMembers.length > 0 ? staffMembers[0] : null
 
           if (staffMember) {
-            setCurrentRole(staffMember.role as any)
+            setCurrentRole(normalizeStaffRole(staffMember.role || metaRole))
             setUserDisplayName(staffMember.full_name || user.email.split('@')[0])
           } else {
-            // Default founder check
+            // Default founder / metadata check
             setUserDisplayName(user.user_metadata?.full_name || user.email.split('@')[0])
-            if (cleanEmail === 'sakib.samadhan@gmail.com' || cleanEmail === 'admin@example.com' || cleanEmail.includes('admin')) {
-              setCurrentRole('shop_owner')
+            if (cleanEmail === 'sakib.samadhan@gmail.com' || cleanEmail === 'admin@example.com' || cleanEmail.includes('admin') || metaRole === 'shop_owner' || metaRole === 'admin') {
+              setCurrentRole(metaRole === 'admin' ? 'admin' : 'shop_owner')
             } else {
               setCurrentRole('staff')
             }
@@ -102,7 +108,7 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
 
   const allNavItems = [
     {
-      name: 'Orders',
+      name: t('admin.orders'),
       href: '/stradmn',
       icon: ShoppingBag,
       isActive: isOrdersActive,
@@ -114,14 +120,14 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
       }
     },
     {
-      name: 'Stats & Analytics',
+      name: t('admin.analytics'),
       href: '/stradmn/stats',
       icon: BarChart3,
       isActive: pathname === '/stradmn/stats',
       visible: canSeeFullDashboard
     },
     {
-      name: 'Contact Inquiries',
+      name: t('admin.messages'),
       href: '/stradmn?tab=messages',
       icon: MessageSquare,
       isActive: isMessagesActive,
@@ -134,28 +140,35 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
       }
     },
     {
-      name: 'Inventory',
+      name: t('admin.products'),
       href: '/stradmn/products',
       icon: Package,
       isActive: pathname === '/stradmn/products',
       visible: true
     },
     {
-      name: 'Categories',
+      name: isBangla ? 'প্রচার ও অফার' : 'Promotions',
+      href: '/stradmn/promotions',
+      icon: Megaphone,
+      isActive: pathname === '/stradmn/promotions',
+      visible: canSeeFullDashboard
+    },
+    {
+      name: t('admin.categories'),
       href: '/stradmn/categories',
       icon: FolderTree,
       isActive: pathname === '/stradmn/categories',
       visible: true
     },
     {
-      name: 'Staff & Roles',
+      name: t('admin.staff'),
       href: '/stradmn/staff',
       icon: Users,
       isActive: pathname === '/stradmn/staff',
       visible: canSeeFullDashboard
     },
     {
-      name: 'Settings',
+      name: t('admin.settings'),
       href: '/stradmn/settings',
       icon: Settings,
       isActive: pathname === '/stradmn/settings',
@@ -184,17 +197,17 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <span className="text-sm font-bold tracking-tight text-white block truncate">
+            <span className="text-sm font-black tracking-tight text-white truncate block">
               {settings.store_name}
             </span>
-            <span className="text-[10px] font-mono text-brand-400 block uppercase tracking-wider">
-              Store Control
+            <span className="text-[10px] text-brand-400 font-bold tracking-wider uppercase block">
+              Management Portal
             </span>
           </div>
         </div>
 
-        {/* Navigation Links */}
-        <nav className="flex-1 space-y-1 px-4 py-6">
+        {/* Navigation Items */}
+        <nav className="flex-1 space-y-1 px-3 py-6 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon
             return (
@@ -202,14 +215,14 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
                 key={item.name}
                 href={item.href}
                 onClick={item.onClick}
-                className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                className={`flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-bold transition duration-150 ${
                   item.isActive
-                    ? 'bg-brand-600 text-white font-semibold shadow-sm'
-                    : 'hover:bg-slate-800 hover:text-white text-slate-300'
+                    ? 'bg-brand-600 text-white shadow-md'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4 flex-shrink-0" />
                   <span>{item.name}</span>
                 </div>
                 {item.badge !== undefined && item.badge !== null && (
@@ -225,17 +238,22 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
             <Link
               href="/"
               target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-800 hover:text-white text-slate-400 transition"
+              className="flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition duration-150"
             >
               <div className="flex items-center gap-3">
                 <ShoppingBag className="h-4 w-4" />
-                <span>View Storefront</span>
+                <span>{isBangla ? 'স্টোরফ্রন্ট দেখুন' : 'View Storefront'}</span>
               </div>
               <ExternalLink className="h-3.5 w-3.5 opacity-60" />
             </Link>
           </div>
         </nav>
+
+        {/* Language Switcher in Desktop Admin Sidebar */}
+        <div className="px-4 py-2 border-t border-slate-800 flex items-center justify-between">
+          <span className="text-[11px] font-bold text-slate-400">Language:</span>
+          <LanguageSwitcher size="sm" />
+        </div>
 
         {/* Desktop Footer User Info & Log Out */}
         <div className="p-4 border-t border-slate-800 space-y-3">
@@ -258,7 +276,7 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
             className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-400 hover:bg-red-950/60 hover:text-red-400 transition"
           >
             <LogOut className="h-3.5 w-3.5" />
-            <span>Log Out</span>
+            <span>{t('admin.logout')}</span>
           </button>
         </div>
       </aside>
@@ -289,6 +307,7 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
         </div>
 
         <div className="flex items-center gap-2">
+          <LanguageSwitcher size="sm" />
           {unreadCount > 0 && (
             <span className="inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-black rounded-full bg-red-500 text-white animate-pulse">
               {unreadCount}
@@ -357,7 +376,7 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
                     className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 hover:bg-slate-800"
                   >
                     <ShoppingBag className="h-4 w-4" />
-                    <span>View Storefront</span>
+                    <span>{isBangla ? 'স্টোরফ্রন্ট দেখুন' : 'View Storefront'}</span>
                   </Link>
                 </div>
               </nav>
@@ -373,7 +392,7 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
                 className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-400 hover:bg-red-950/60"
               >
                 <LogOut className="h-4 w-4" />
-                <span>Log Out</span>
+                <span>{t('admin.logout')}</span>
               </button>
             </div>
           </div>

@@ -50,11 +50,13 @@ function AdminLoginContent() {
       }
 
       // Check staff_members table
-      const { data: staffMember } = await supabase
+      const { data: staffMembers } = await supabase
         .from('staff_members')
         .select('*')
-        .eq('email', cleanEmail)
-        .single()
+        .or(`user_id.eq.${user.id},email.ilike.${cleanEmail}`)
+        .limit(1)
+
+      const staffMember = staffMembers && staffMembers.length > 0 ? staffMembers[0] : null
 
       if (staffMember) {
         if (staffMember.status === 'suspended') {
@@ -68,13 +70,16 @@ function AdminLoginContent() {
         return
       }
 
-      // Fallback founder / admin emails
+      // Fallback founder / admin / store owner metadata
+      const metaRole = (user.user_metadata?.role || '').toLowerCase().trim()
       const isFounder = (
         cleanEmail === 'admin@example.com' ||
         cleanEmail.includes('admin') ||
         cleanEmail === 'sakib.samadhan@gmail.com' ||
-        user.user_metadata?.role === 'admin' ||
-        user.user_metadata?.role === 'shop_owner'
+        metaRole === 'admin' ||
+        metaRole === 'shop_owner' ||
+        metaRole === 'store_owner' ||
+        metaRole === 'owner'
       )
 
       if (isFounder) {

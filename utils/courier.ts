@@ -110,11 +110,22 @@ export async function bookSteadfastConsignment(order: any, codAmount: number) {
   const baseUrl = steadfast_base_url?.replace(/\/$/, '') || 'https://portal.steadfast.com.bd/api/v1'
   const invoiceNumber = `INV-${order.id.slice(0, 8).toUpperCase()}`
 
+  // Enrich address with city/zone/area details for Steadfast's AI Thana/Police Station auto-detection
+  const extraLocations = [
+    order.payment_details?.shipping_metadata?.area_name,
+    order.payment_details?.shipping_metadata?.zone_name,
+    order.payment_details?.shipping_metadata?.city_name
+  ].filter(Boolean).join(', ')
+
+  const fullRecipientAddress = extraLocations && !order.shipping_address.includes(extraLocations)
+    ? `${order.shipping_address}, ${extraLocations}`
+    : order.shipping_address
+
   const payload = {
     invoice: invoiceNumber,
     recipient_name: order.customer_name,
     recipient_phone: order.customer_phone,
-    recipient_address: order.shipping_address,
+    recipient_address: fullRecipientAddress,
     cod_amount: Number(codAmount),
     note: order.payment_method === 'COD'
       ? `Prepaid Delivery Charge. Collect COD ৳${codAmount}.`
@@ -141,5 +152,62 @@ export async function bookSteadfastConsignment(order: any, codAmount: number) {
   } catch (error: any) {
     console.error('Steadfast Booking Error:', error.response?.data || error.message)
     return null
+  }
+}
+
+export async function checkSteadfastStatus(cid?: string, trackingCode?: string) {
+  const settings = await getStoreSettings()
+  const { steadfast_api_key, steadfast_secret_key, steadfast_base_url } = settings
+
+  if (!steadfast_api_key || !steadfast_secret_key) {
+    throw new Error('Steadfast credentials not configured')
+  }
+
+  const baseUrl = steadfast_base_url?.replace(/\/$/, '') || 'https://portal.steadfast.com.bd/api/v1'
+  let endpoint = ''
+
+  if (cid) {
+    endpoint = `${baseUrl}/status_by_cid/${cid}`
+  } else if (trackingCode) {
+    endpoint = `${baseUrl}/status_by_trackingcode/${trackingCode}`
+  } else {
+    throw new Error('Please provide Steadfast consignment ID or tracking code')
+  }
+
+  const response = await axios.get(endpoint, {
+    headers: {
+      'Api-Key': steadfast_api_key,
+      'Secret-Key': steadfast_secret_key
+    }
+  })
+
+  const raw = response.data
+  const deliveryStatus = (raw?.delivery_status || raw?.consignment?.status || raw?.status || '').toString().toLowerCase().trim()
+
+  return {
+    delivery_status: deliveryStatus,
+    raw
+  }
+}
+
+export async function checkPathaoStatus(consignmentId: string) {
+  const settings = await getStoreSettings()
+  const pathao_api_url = settings.pathao_api_url || process.env.PATHAO_API_URL || 'https://courier-api-sandbox.pathao.com'
+
+  const token = await getPathaoToken()
+  const response = await axios.get(`${pathao_api_url}/aladdin/api/v1/orders/${consignmentId}/info`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json'
+    }
+  })
+
+  const raw = response.data?.data || response.data
+  const orderStatus = (raw?.order_status || raw?.order_status_slug || raw?.status || '').toString().toLowerCase().trim()
+
+  return {
+    delivery_status: orderStatus,
+    raw
   }
 }

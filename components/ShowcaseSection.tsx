@@ -7,6 +7,7 @@ import {
   ChevronRight, Sparkles, TrendingUp, Award, Flame, Tag 
 } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
+import { useLanguage } from '@/context/LanguageContext'
 import ProductCard, { Product, Category, extractProductOptions } from '@/components/ProductCard'
 
 interface ShowcaseSectionProps {
@@ -31,6 +32,7 @@ function CarouselHeroBanner({
   type: 'featured' | 'trending' | 'best_seller'
 }) {
   const { addToCart } = useCart()
+  const { t, toBengaliDigits, isBangla } = useLanguage()
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showVariantModal, setShowVariantModal] = useState(false)
   const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({})
@@ -128,13 +130,13 @@ function CarouselHeroBanner({
   const categoryName = categories
     .filter((c) => productCatIds.includes(c.id))
     .map((c) => c.name)
-    .join(', ') || 'Aquatics'
+    .join(', ') || (isBangla ? 'পণ্য' : 'Aquatics')
 
   const heroBadge = type === 'featured'
-    ? { text: 'Featured Spotlight', bg: 'bg-amber-500 text-white' }
+    ? { text: isBangla ? 'স্পেশাল ফিচার্ড' : 'Featured Spotlight', bg: 'bg-amber-500 text-white' }
     : type === 'trending'
-    ? { text: 'Trending This Month', bg: 'bg-purple-600 text-white' }
-    : { text: 'Top Best Seller', bg: 'bg-blue-600 text-white' }
+    ? { text: isBangla ? 'জনপ্রিয় পণ্য' : 'Trending This Month', bg: 'bg-purple-600 text-white' }
+    : { text: isBangla ? 'সর্বোচ্চ বিক্রিত' : 'Top Best Seller', bg: 'bg-blue-600 text-white' }
 
   return (
     <div 
@@ -166,7 +168,7 @@ function CarouselHeroBanner({
         {activeProduct.old_price && activeProduct.old_price > 0 && (
           <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-black uppercase tracking-wider text-white shadow-lg">
             <Tag className="h-3 w-3" />
-            Save ৳{(Number(activeProduct.old_price) - Number(activeProduct.price)).toLocaleString()}
+            {isBangla ? `সাশ্রয় ৳${toBengaliDigits((Number(activeProduct.old_price) - Number(activeProduct.price)).toLocaleString())}` : `Save ৳${(Number(activeProduct.old_price) - Number(activeProduct.price)).toLocaleString()}`}
           </span>
         )}
       </div>
@@ -188,9 +190,11 @@ function CarouselHeroBanner({
           </Link>
 
           {/* Subtitle / Description Teaser */}
-          {activeProduct.description && (
+          {(activeProduct.short_description || activeProduct.description) && (
             <p className="text-xs sm:text-sm md:text-base text-slate-200/90 line-clamp-2 leading-relaxed drop-shadow max-w-xl mx-auto">
-              {activeProduct.description}
+              {activeProduct.short_description
+                ? activeProduct.short_description
+                : activeProduct.description?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()}
             </p>
           )}
         </div>
@@ -207,7 +211,7 @@ function CarouselHeroBanner({
             >
               <ShoppingBag className="h-4 w-4 text-brand-600 group-hover/btn:scale-110 transition-transform" />
               <span>
-                Buy Now • ৳{Number(activeProduct.price).toLocaleString()}
+                {t('product.buy_now')} • ৳{Number(activeProduct.price).toLocaleString()}
               </span>
               {activeProduct.old_price && activeProduct.old_price > 0 && (
                 <span className="text-[11px] text-slate-400 line-through font-normal ml-1 hidden sm:inline">
@@ -217,7 +221,7 @@ function CarouselHeroBanner({
             </button>
           ) : (
             <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-white bg-red-600/90 px-4 py-2.5 rounded-xl backdrop-blur-md">
-              Sold Out
+              {t('product.out_of_stock')}
             </span>
           )}
 
@@ -227,7 +231,7 @@ function CarouselHeroBanner({
             className="flex items-center gap-1.5 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-black/40 hover:bg-black/60 text-white text-xs sm:text-sm font-bold border border-white/30 backdrop-blur-md transition-all shadow-lg"
           >
             <Eye className="h-4 w-4" />
-            <span>Details</span>
+            <span>{t('common.view')}</span>
           </Link>
 
           {/* Comic Dialogue Variant Popover */}
@@ -239,7 +243,7 @@ function CarouselHeroBanner({
             >
               <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 h-4 w-4 rotate-45 border-b-2 border-r-2 border-brand-500 bg-white" />
               <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
-                <span className="text-xs font-bold text-slate-900">Select Option to Buy</span>
+                <span className="text-xs font-bold text-slate-900">{t('product.select_variant')}</span>
                 <button onClick={() => setShowVariantModal(false)} className="text-slate-400 hover:text-slate-600">
                   <X className="h-4 w-4" />
                 </button>
@@ -279,7 +283,7 @@ function CarouselHeroBanner({
                   className="w-full rounded-xl bg-brand-600 hover:bg-brand-500 text-white py-2.5 text-xs font-bold shadow-md flex items-center justify-center gap-1.5 transition"
                 >
                   <Check className="h-4 w-4" />
-                  <span>Confirm & Add to Cart</span>
+                  <span>{t('product.add_to_cart')}</span>
                 </button>
               </div>
             </div>
@@ -342,6 +346,7 @@ export default function ShowcaseSection({
   categories,
   bgStyle = 'bg-white'
 }: ShowcaseSectionProps) {
+  const { t } = useLanguage()
   if (!products || products.length === 0) return null
 
   // Top 4 products for desktop grid (including #1)
@@ -368,7 +373,7 @@ export default function ShowcaseSection({
             href={viewAllHref}
             className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-700 hover:text-brand-800 bg-brand-50 hover:bg-brand-100 border border-brand-200/60 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition shadow-sm"
           >
-            <span>View All</span>
+            <span>{t('product.view_all')}</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>

@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/server'
+import { verifyStaffAuth } from '@/utils/auth'
+import { restoreOrderInventory, deductOrderInventory, restoreProductStock, deductProductStock } from '@/utils/inventory'
 
 export const dynamic = 'force-dynamic'
 
 export async function PUT(request: NextRequest) {
   try {
-    const userClient = await createClient()
-
-    // Check if user is authenticated and is admin
-    const { data: { user } } = await userClient.auth.getUser()
-    const adminEmail = 'admin@example.com'
-    if (!user || (user.email !== adminEmail && !user.email?.includes('admin') && user.email !== 'sakib.samadhan@gmail.com')) {
-      return NextResponse.json({ error: 'Unauthorized access' }, { status: 403 })
+    const auth = await verifyStaffAuth(['shop_owner', 'admin', 'staff'])
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
 
     const body = await request.json()
@@ -52,7 +50,56 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    // 2. Handle deleted item IDs
+    const oldStatus = existingOrder.order_status || 'Pending'
+    const newStatus = order_status || oldStatus
+
+    // 2. INVENTORY RESTORATION / DEDUCTION ON STATUS CHANGE
+    if (oldStatus !== 'Cancelled' && newStatus === 'Cancelled') {
+      // Order cancelled -> Restore all item stocks to inventory
+      await restoreOrderInventory(adminDb, id)
+    } else if (oldStatus === 'Cancelled' && newStatus !== 'Cancelled') {
+      // Order re-activated from Cancelled -> Deduct item stocks from inventory
+      await deductOrderInventory(adminDb, id)
+    } else if (newStatus !== 'Cancelled') {
+      // Order is active and items are being edited:
+
+      // A. Restore stock for deleted item lines
+      if (Array.isArray(deleted_item_ids) && deleted_item_ids.length > 0) {
+        for (const delId of deleted_item_ids) {
+          const delItem = existingOrder.order_items?.find((it: any) => it.id === delId)
+          if (delItem) {
+            await restoreProductStock(
+              adminDb,
+              delItem.product_id,
+              Number(delItem.quantity) || 0,
+              delItem.selected_variations
+            )
+          }
+        }
+      }
+
+      // B. Adjust stock difference for modified item quantities
+      if (Array.isArray(items) && items.length > 0) {
+        for (const it of items) {
+          if (it.id) {
+            const existingItem = existingOrder.order_items?.find((x: any) => x.id === it.id)
+            if (existingItem) {
+              const oldQty = Number(existingItem.quantity) || 0
+              const newQty = Math.max(1, Number(it.quantity || 1))
+              const diff = newQty - oldQty
+
+              if (diff > 0) {
+                await deductProductStock(adminDb, existingItem.product_id, diff, existingItem.selected_variations)
+              } else if (diff < 0) {
+                await restoreProductStock(adminDb, existingItem.product_id, Math.abs(diff), existingItem.selected_variations)
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Handle deleted item IDs in database
     if (Array.isArray(deleted_item_ids) && deleted_item_ids.length > 0) {
       const { error: deleteError } = await adminDb
         .from('order_items')
@@ -65,7 +112,7 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // 3. Update existing item quantities & prices
+    // 4. Update existing item quantities & prices
     let itemsSubtotal = 0
     if (Array.isArray(items) && items.length > 0) {
       for (const item of items) {
@@ -93,9 +140,10 @@ export async function PUT(request: NextRequest) {
     }
 
     const parsedDeliveryCharge = Number(delivery_charge !== undefined ? delivery_charge : existingOrder.delivery_charge)
-    const newTotalPrice = itemsSubtotal + parsedDeliveryCharge
+    const discountAmount = Number(existingOrder.discount_amount || 0)
+    const newTotalPrice = Math.max(0, itemsSubtotal + parsedDeliveryCharge - discountAmount)
 
-    // 4. Update payment_details with shipping metadata and custom advance_paid
+    // 5. Update payment_details with shipping metadata and custom advance_paid
     const paymentDetails = existingOrder.payment_details || {}
     paymentDetails.shipping_metadata = {
       ...(paymentDetails.shipping_metadata || {}),
@@ -108,7 +156,7 @@ export async function PUT(request: NextRequest) {
       paymentDetails.advance_paid = Number(advance_paid)
     }
 
-    // 5. Update the main order row
+    // 6. Update the main order row
     const updatePayload: Record<string, any> = {
       customer_name,
       customer_phone,
@@ -135,7 +183,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: updateError.message }, { status: 500 })
     }
 
-    // 6. Fetch complete updated order with items and products
+    // 7. Fetch complete updated order with items and products
     const { data: updatedOrder, error: reloadError } = await adminDb
       .from('orders')
       .select('*, order_items(*, products(name))')
@@ -156,13 +204,9 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const userClient = await createClient()
-
-    // Check if user is authenticated and is admin
-    const { data: { user } } = await userClient.auth.getUser()
-    const adminEmail = 'admin@example.com'
-    if (!user || (user.email !== adminEmail && !user.email?.includes('admin') && user.email !== 'sakib.samadhan@gmail.com')) {
-      return NextResponse.json({ error: 'Unauthorized access' }, { status: 403 })
+    const auth = await verifyStaffAuth(['shop_owner', 'admin', 'staff'])
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
 
     const { searchParams } = new URL(request.url)
@@ -174,7 +218,19 @@ export async function DELETE(request: NextRequest) {
 
     const adminDb = createAdminClient()
 
-    // 1. Delete order_items first
+    // 1. Fetch order status before deletion
+    const { data: existingOrder } = await adminDb
+      .from('orders')
+      .select('order_status')
+      .eq('id', id)
+      .single()
+
+    // 2. Restore inventory if deleting an active (non-cancelled) order
+    if (existingOrder && existingOrder.order_status !== 'Cancelled') {
+      await restoreOrderInventory(adminDb, id)
+    }
+
+    // 3. Delete order_items first
     const { error: itemsError } = await adminDb
       .from('order_items')
       .delete()
@@ -184,7 +240,7 @@ export async function DELETE(request: NextRequest) {
       console.error('Failed to delete order items:', itemsError)
     }
 
-    // 2. Delete the order
+    // 4. Delete the order
     const { error: orderError } = await adminDb
       .from('orders')
       .delete()

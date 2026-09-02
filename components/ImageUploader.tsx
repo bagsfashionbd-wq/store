@@ -3,6 +3,8 @@
 import React, { useState, useRef } from 'react'
 import { UploadCloud, X, Loader2, Play, Image as ImageIcon, CheckCircle } from 'lucide-react'
 
+import { useStore } from '@/context/StoreContext'
+
 interface ImageUploaderProps {
   value?: string | string[]
   onChange: (value: any) => void
@@ -14,9 +16,9 @@ interface ImageUploaderProps {
   single?: boolean
 }
 
-// Client-side canvas compression for images
-async function compressImage(file: File): Promise<File> {
-  // If not image or is SVG / GIF (which shouldn't be flattened to canvas), return as-is
+// Client-side canvas compression for images with optional watermark
+async function compressImage(file: File, watermarkLogoUrl?: string, watermarkEnabled?: boolean): Promise<File> {
+  // If not image or is SVG / GIF, return as-is
   if (!file.type.startsWith('image/') || file.type === 'image/svg+xml' || file.type === 'image/gif') {
     return file
   }
@@ -31,7 +33,7 @@ async function compressImage(file: File): Promise<File> {
         const canvas = document.createElement('canvas')
         let { width, height } = img
 
-        // Max dimension: 1600px (crystal clear on retina displays, minimal byte size)
+        // Max dimension: 1600px
         const MAX_DIM = 1600
         if (width > MAX_DIM || height > MAX_DIM) {
           if (width > height) {
@@ -53,21 +55,51 @@ async function compressImage(file: File): Promise<File> {
 
         ctx.drawImage(img, 0, 0, width, height)
 
-        canvas.toBlob(
-          (blob) => {
-            if (!blob || blob.size >= file.size) {
-              resolve(file) // keep original if compression didn't save size
-            } else {
-              const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, '.webp'), {
-                type: 'image/webp',
-                lastModified: Date.now()
-              })
-              resolve(compressedFile)
+        const exportCanvas = () => {
+          canvas.toBlob(
+            (blob) => {
+              if (!blob || blob.size >= file.size) {
+                resolve(file)
+              } else {
+                const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, '.webp'), {
+                  type: 'image/webp',
+                  lastModified: Date.now()
+                })
+                resolve(compressedFile)
+              }
+            },
+            'image/webp',
+            0.85
+          )
+        }
+
+        // Apply watermark if enabled
+        if (watermarkEnabled && watermarkLogoUrl && watermarkLogoUrl.trim()) {
+          const watermarkImg = new Image()
+          watermarkImg.crossOrigin = 'anonymous'
+          watermarkImg.src = watermarkLogoUrl
+          watermarkImg.onload = () => {
+            try {
+              const wmSize = Math.max(48, Math.round(Math.min(width, height) * 0.12))
+              const padding = Math.round(wmSize * 0.25)
+              const x = width - wmSize - padding
+              const y = height - wmSize - padding
+
+              ctx.save()
+              ctx.globalAlpha = 0.35
+              ctx.drawImage(watermarkImg, x, y, wmSize, wmSize)
+              ctx.restore()
+            } catch (err) {
+              console.warn('Could not apply watermark:', err)
             }
-          },
-          'image/webp',
-          0.85 // 85% quality WebP
-        )
+            exportCanvas()
+          }
+          watermarkImg.onerror = () => {
+            exportCanvas()
+          }
+        } else {
+          exportCanvas()
+        }
       }
       img.onerror = () => resolve(file)
     }
@@ -85,10 +117,14 @@ export default function ImageUploader({
   description = 'Upload up to 5 images and 1 optional video',
   single = false
 }: ImageUploaderProps) {
+  const { settings } = useStore()
   const [uploading, setUploading] = useState(false)
   const [progressText, setProgressText] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Max 10MB file limit
+  const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
 
   // Normalize current items array
   const currentItems: string[] = single
@@ -112,12 +148,19 @@ export default function ImageUploader({
 
       for (let i = 0; i < files.length; i++) {
         let file = files[i]
+
+        // Validate 10MB size limit
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          setErrorMsg(`"${file.name}" exceeds the 10MB maximum file size limit.`)
+          continue
+        }
+
         const isFileVideo = file.type.startsWith('video/')
 
         if (single) {
           setProgressText(`Uploading ${file.name}...`)
           if (file.type.startsWith('image/')) {
-            file = await compressImage(file)
+            file = await compressImage(file, settings?.logo_url, settings?.watermark_enabled)
           }
           const uploadedUrl = await uploadSingleFile(file, folder)
           if (uploadedUrl) {
@@ -143,7 +186,7 @@ export default function ImageUploader({
             continue
           }
           setProgressText(`Optimizing image ${i + 1} of ${files.length}...`)
-          file = await compressImage(file)
+          file = await compressImage(file, settings?.logo_url, settings?.watermark_enabled)
         }
 
         setProgressText(`Uploading ${file.name}...`)
@@ -158,7 +201,7 @@ export default function ImageUploader({
       }
     } catch (err: any) {
       console.error(err)
-      setErrorMsg(err.message || 'Upload failed. Please check network.')
+      setErrorMsg(err.message || 'Upload failed. Please check your network connection.')
     } finally {
       setUploading(false)
       setProgressText('')

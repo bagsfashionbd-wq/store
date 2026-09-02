@@ -4,6 +4,8 @@ import { getStoreSettings } from '@/utils/settings'
 import { bookSteadfastConsignment } from '@/utils/courier'
 import axios from 'axios'
 
+export const dynamic = 'force-dynamic'
+
 // POST: Manual dispatch from Admin
 export async function POST(request: NextRequest) {
   try {

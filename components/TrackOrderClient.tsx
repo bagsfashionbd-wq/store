@@ -11,6 +11,7 @@ import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import CartDrawer from '@/components/CartDrawer'
 import { PublicStoreSettings } from '@/utils/settings'
+import { useLanguage } from '@/context/LanguageContext'
 
 interface TrackOrderClientProps {
   settings: PublicStoreSettings
@@ -42,6 +43,7 @@ interface TrackedOrder {
   pathao_status?: string
   steadfast_consignment_id?: string
   steadfast_tracking_code?: string
+  payment_details?: any
   created_at: string
   order_items?: OrderItem[]
 }
@@ -49,6 +51,7 @@ interface TrackedOrder {
 export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
   const searchParams = useSearchParams()
   const initialQuery = searchParams.get('id') || searchParams.get('phone') || searchParams.get('query') || ''
+  const { t, toBengaliDigits, isBangla } = useLanguage()
 
   const [query, setQuery] = useState(initialQuery)
   const [loading, setLoading] = useState(false)
@@ -118,10 +121,10 @@ export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
           
           <div className="max-w-md mx-auto space-y-2">
             <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">
-              Track Your Consignment & Order
+              {t('track.track_title')}
             </h1>
             <p className="text-xs sm:text-sm text-slate-500">
-              Enter your <strong>Invoice / Order ID</strong> (e.g. <span className="font-mono text-slate-700">956734A1</span>) or your <strong>Customer Mobile Number</strong>.
+              {t('track.track_subtitle')}
             </p>
           </div>
 
@@ -136,7 +139,7 @@ export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
               <Search className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
               <input
                 type="text"
-                placeholder="e.g. 956734A1 or 017XXXXXXXX"
+                placeholder={t('track.search_placeholder')}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-11 pr-4 py-3 text-sm font-medium text-slate-900 outline-none focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10 transition-all font-mono"
@@ -150,11 +153,11 @@ export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Searching...</span>
+                  <span>{t('common.loading')}</span>
                 </>
               ) : (
                 <>
-                  <span>Track Status</span>
+                  <span>{t('track.search_button')}</span>
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
@@ -174,13 +177,21 @@ export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500">
-                Found {orders.length} {orders.length === 1 ? 'Order' : 'Orders'}
+                {isBangla 
+                  ? `${toBengaliDigits(orders.length)} টি অর্ডার পাওয়া গেছে` 
+                  : `Found ${orders.length} ${orders.length === 1 ? 'Order' : 'Orders'}`}
               </h2>
             </div>
 
             {orders.map((order) => {
               const currentStep = getStatusStep(order)
               const isCancelled = (order.order_status || '').toLowerCase() === 'cancelled'
+              const isCompletedOrDelivered = (order.order_status || '').toLowerCase() === 'delivered' || (order.order_status || '').toLowerCase() === 'completed' || order.pathao_status === 'delivered'
+              const isFullyPaid = order.payment_status === 'FullyPaid' || isCompletedOrDelivered
+              const isPartiallyPaid = !isFullyPaid && (order.payment_status === 'DeliveryChargePrePaid' || (order.payment_details?.advance_paid !== undefined && Number(order.payment_details.advance_paid) > 0))
+              const advanceAmount = order.payment_details?.advance_paid !== undefined ? Number(order.payment_details.advance_paid) : (order.payment_status === 'DeliveryChargePrePaid' ? Number(order.delivery_charge || 0) : 0)
+              const dueOnDelivery = Math.max(0, Number(order.total_price) - advanceAmount)
+
               const shortId = order.id.slice(0, 8).toUpperCase()
               const orderDate = new Date(order.created_at).toLocaleDateString('en-US', {
                 month: 'short',
@@ -194,7 +205,7 @@ export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
                 ? 'Steadfast Courier' 
                 : order.shipping_provider === 'pathao'
                   ? 'Pathao Express'
-                  : 'Standard / Home Delivery'
+                  : isBangla ? 'হোম ডেলিভারি' : 'Standard / Home Delivery'
 
               return (
                 <div
@@ -211,7 +222,7 @@ export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
                         <span className="text-xs text-slate-500 font-medium">{orderDate}</span>
                       </div>
                       <p className="text-xs text-slate-600 mt-1 font-medium">
-                        Recipient: <strong className="text-slate-900">{order.customer_name}</strong> ({order.customer_phone})
+                        {t('track.recipient')}: <strong className="text-slate-900">{order.customer_name}</strong> ({order.customer_phone})
                       </p>
                     </div>
 
@@ -222,7 +233,7 @@ export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
                         className="inline-flex items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3.5 py-2 text-xs font-bold text-brand-700 hover:bg-brand-100 transition shadow-sm"
                       >
                         <FileText className="h-4 w-4" />
-                        <span>View Invoice</span>
+                        <span>{t('track.view_invoice')}</span>
                       </Link>
                     </div>
                   </div>
@@ -233,15 +244,15 @@ export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
                       <div className="flex items-center gap-3 rounded-2xl bg-red-50 p-4 border border-red-200 text-red-800">
                         <XCircle className="h-6 w-6 flex-shrink-0 text-red-600" />
                         <div>
-                          <p className="text-sm font-bold text-red-950">Order Cancelled</p>
+                          <p className="text-sm font-bold text-red-950">{t('track.cancelled')}</p>
                           <p className="text-xs text-red-700 mt-0.5">
-                            This order has been declined or cancelled. For inquiries, please reach out to customer support.
+                            {t('track.cancelled_desc')}
                           </p>
                         </div>
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Order Progress</p>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('track.order_progress')}</p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                           
                           {/* Step 1: Placed */}
@@ -252,9 +263,9 @@ export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
                               <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
                                 currentStep >= 1 ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-500'
                               }`}>1</span>
-                              <p className="text-xs font-bold text-slate-900">Order Placed</p>
+                              <p className="text-xs font-bold text-slate-900">{t('track.placed')}</p>
                             </div>
-                            <p className="text-[11px] text-slate-500 mt-1.5">Received in system</p>
+                            <p className="text-[11px] text-slate-500 mt-1.5">{t('track.placed_desc')}</p>
                           </div>
 
                           {/* Step 2: Confirmed */}
@@ -265,10 +276,10 @@ export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
                               <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
                                 currentStep >= 2 ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-500'
                               }`}>2</span>
-                              <p className="text-xs font-bold text-slate-900">Confirmed</p>
+                              <p className="text-xs font-bold text-slate-900">{t('track.confirmed')}</p>
                             </div>
                             <p className="text-[11px] text-slate-500 mt-1.5">
-                              {currentStep >= 2 ? 'Order approved' : 'Awaiting review'}
+                              {currentStep >= 2 ? t('track.confirmed_desc') : 'Awaiting review'}
                             </p>
                           </div>
 
@@ -280,7 +291,7 @@ export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
                               <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
                                 currentStep >= 3 ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-500'
                               }`}>3</span>
-                              <p className="text-xs font-bold text-slate-900">Dispatched</p>
+                              <p className="text-xs font-bold text-slate-900">{t('track.dispatched')}</p>
                             </div>
                             <p className="text-[11px] text-slate-500 mt-1.5">
                               {currentStep >= 3 ? providerLabel : 'Packaging items'}
@@ -295,10 +306,10 @@ export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
                               <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
                                 currentStep >= 4 ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-500'
                               }`}>4</span>
-                              <p className="text-xs font-bold text-slate-900">Delivered</p>
+                              <p className="text-xs font-bold text-slate-900">{t('track.delivered')}</p>
                             </div>
                             <p className="text-[11px] text-slate-500 mt-1.5">
-                              {currentStep >= 4 ? 'Handed over' : 'In transit'}
+                              {currentStep >= 4 ? t('track.delivered_desc') : 'In transit'}
                             </p>
                           </div>
 
@@ -311,10 +322,10 @@ export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
                   <div className="p-6 sm:p-8 grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs">
                     <div>
                       <p className="font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                        <MapPin className="h-3.5 w-3.5 text-brand-600" /> Delivery Details
+                        <MapPin className="h-3.5 w-3.5 text-brand-600" /> {t('track.delivery_details')}
                       </p>
                       <p className="font-semibold text-slate-900 leading-relaxed">{order.shipping_address}</p>
-                      <p className="text-slate-500 mt-1 font-medium">Logistics Partner: <strong className="text-slate-800">{providerLabel}</strong></p>
+                      <p className="text-slate-500 mt-1 font-medium">{t('track.courier_partner')}: <strong className="text-slate-800">{providerLabel}</strong></p>
                       
                       {order.steadfast_tracking_code && (
                         <p className="mt-1 font-mono text-blue-600 font-bold">
@@ -330,21 +341,45 @@ export default function TrackOrderClient({ settings }: TrackOrderClientProps) {
 
                     <div>
                       <p className="font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-brand-600" /> Payment & Charges
+                        <CheckCircle2 className="h-3.5 w-3.5 text-brand-600" /> {t('track.payment_charges')}
                       </p>
-                      <div className="space-y-1 text-slate-600 font-medium">
+                      <div className="space-y-2 text-slate-600 font-medium">
                         <div className="flex justify-between">
-                          <span>Total Amount:</span>
-                          <span className="font-bold text-slate-900">৳{Number(order.total_price).toLocaleString()}</span>
+                          <span>{t('common.total')}:</span>
+                          <span className="font-black text-slate-950">৳{Number(order.total_price).toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span>Payment Method:</span>
-                          <span className="font-semibold text-slate-800">{order.payment_method}</span>
+                          <span>{t('checkout.payment_method')}:</span>
+                          <span className="font-semibold text-slate-800">{order.payment_method === 'COD' ? t('checkout.cod_title') : order.payment_method}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span>Payment Status:</span>
-                          <span className="font-bold text-brand-700">{order.payment_status}</span>
+                        <div className="flex justify-between items-center pt-1.5 border-t border-slate-100">
+                          <span>{t('track.payment_status')}:</span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            isFullyPaid
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : isPartiallyPaid
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                : order.payment_status === 'Failed'
+                                  ? 'bg-red-50 text-red-700 border border-red-200'
+                                  : 'bg-amber-50 text-amber-800 border border-amber-200'
+                          }`}>
+                            {isCompletedOrDelivered
+                              ? t('track.paid_on_delivery')
+                              : order.payment_status === 'FullyPaid'
+                                ? t('track.fully_paid')
+                                : isPartiallyPaid
+                                  ? `${t('track.advance_paid')} (৳${advanceAmount.toLocaleString()})`
+                                  : order.payment_status === 'Failed'
+                                    ? t('track.failed')
+                                    : t('track.pending_cod')}
+                          </span>
                         </div>
+                        {!isFullyPaid && (
+                          <div className="flex justify-between text-[11px] text-amber-800 font-bold bg-amber-50/60 p-2 rounded-lg border border-amber-200/60">
+                            <span>{t('track.due_amount')}:</span>
+                            <span>৳{dueOnDelivery.toLocaleString()}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

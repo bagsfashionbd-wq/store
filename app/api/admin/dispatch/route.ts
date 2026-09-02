@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/server'
+import { verifyStaffAuth } from '@/utils/auth'
 import { getStoreSettings } from '@/utils/settings'
 import { getPathaoToken, bookSteadfastConsignment } from '@/utils/courier'
 import axios from 'axios'
@@ -8,19 +9,16 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
-    const userClient = await createClient()
+    const auth = await verifyStaffAuth(['shop_owner', 'admin', 'staff'])
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
     const adminDb = createAdminClient()
     const { order_id, provider: requestedProvider } = await request.json()
 
     if (!order_id) {
       return NextResponse.json({ error: 'Order ID is required' }, { status: 400 })
-    }
-
-    // Role check
-    const { data: { user } } = await userClient.auth.getUser()
-    const adminEmail = 'admin@example.com'
-    if (!user || (user.email !== adminEmail && !user.email?.includes('admin') && user.email !== 'sakib.samadhan@gmail.com')) {
-      return NextResponse.json({ error: 'Unauthorized access' }, { status: 403 })
     }
 
     // Fetch order

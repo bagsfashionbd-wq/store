@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
+import { verifyStaffAuth } from '@/utils/auth'
+
+export const dynamic = 'force-dynamic'
 
 // GET: Fetch all categories
 export async function GET() {
@@ -21,6 +24,11 @@ export async function GET() {
 // POST: Create category
 export async function POST(request: NextRequest) {
   try {
+    const auth = await verifyStaffAuth(['shop_owner', 'admin', 'staff'])
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
     const supabase = createAdminClient()
     const body = await request.json()
     const { name, slug, description, parent_id } = body
@@ -57,6 +65,11 @@ export async function POST(request: NextRequest) {
 // PUT: Update category
 export async function PUT(request: NextRequest) {
   try {
+    const auth = await verifyStaffAuth(['shop_owner', 'admin', 'staff'])
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
     const supabase = createAdminClient()
     const body = await request.json()
     const { id, name, slug, description, parent_id } = body
@@ -97,6 +110,11 @@ export async function PUT(request: NextRequest) {
 // DELETE: Delete category
 export async function DELETE(request: NextRequest) {
   try {
+    const auth = await verifyStaffAuth(['shop_owner', 'admin', 'staff'])
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
     const supabase = createAdminClient()
     const { id } = await request.json()
 

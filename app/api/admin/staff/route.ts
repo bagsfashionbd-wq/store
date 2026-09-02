@@ -1,9 +1,17 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
+import { verifyStaffAuth } from '@/utils/auth'
 
-// GET: List all staff members
+export const dynamic = 'force-dynamic'
+
+// GET: List all staff members (Admins and Shop Owners only)
 export async function GET(request: NextRequest) {
   try {
+    const auth = await verifyStaffAuth(['shop_owner', 'admin'])
+    if (!auth.authorized) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    }
+
     const supabase = createAdminClient()
 
     const { data: staffList, error } = await supabase
@@ -12,7 +20,6 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (error) {
-      // If table does not exist or error, return empty list gracefully
       console.warn('Error fetching staff members:', error.message)
       return NextResponse.json({ success: true, data: [] })
     }
@@ -27,6 +34,11 @@ export async function GET(request: NextRequest) {
 // POST: Add new staff member (creates auth user + staff_members record)
 export async function POST(request: NextRequest) {
   try {
+    const auth = await verifyStaffAuth(['shop_owner', 'admin'])
+    if (!auth.authorized) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    }
+
     const body = await request.json()
     const { email, password, full_name, role = 'staff', phone = '' } = body
 
@@ -110,6 +122,11 @@ export async function POST(request: NextRequest) {
 // PATCH: Update staff member (Role, Status, Name, Password)
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await verifyStaffAuth(['shop_owner', 'admin'])
+    if (!auth.authorized) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    }
+
     const body = await request.json()
     const { id, role, status, full_name, phone, password } = body
 
@@ -174,6 +191,11 @@ export async function PATCH(request: NextRequest) {
 // DELETE: Remove staff member
 export async function DELETE(request: NextRequest) {
   try {
+    const auth = await verifyStaffAuth(['shop_owner', 'admin'])
+    if (!auth.authorized) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    }
+
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 

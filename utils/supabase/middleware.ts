@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { normalizeStaffRole } from '@/utils/staff'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -36,42 +37,45 @@ export async function updateSession(request: NextRequest) {
   let isSuspended = false
 
   if (user && user.email) {
-    const cleanEmail = user.email.toLowerCase()
+    const cleanEmail = user.email.toLowerCase().trim()
+    const metaRole = normalizeStaffRole(user.user_metadata?.role)
     
     // Check staff_members table
     try {
-      const { data: staffMember } = await supabase
+      const { data: staffMembers } = await supabase
         .from('staff_members')
         .select('role, status')
-        .eq('email', cleanEmail)
-        .single()
+        .or(`user_id.eq.${user.id},email.ilike.${cleanEmail}`)
+        .limit(1)
+
+      const staffMember = staffMembers && staffMembers.length > 0 ? staffMembers[0] : null
 
       if (staffMember) {
         if (staffMember.status === 'suspended') {
           isSuspended = true
         } else {
           isAuthorized = true
-          userRole = staffMember.role as any
+          userRole = normalizeStaffRole(staffMember.role || metaRole)
         }
       } else {
-        // Fallback for primary founder/admin
+        // Fallback for primary founder/admin or metadata shop_owner
         const isFounder = (
           cleanEmail === 'sakib.samadhan@gmail.com' ||
           cleanEmail === 'admin@example.com' ||
           cleanEmail.includes('admin') ||
-          user.user_metadata?.role === 'admin' ||
-          user.user_metadata?.role === 'shop_owner'
+          metaRole === 'admin' ||
+          metaRole === 'shop_owner'
         )
         if (isFounder) {
           isAuthorized = true
-          userRole = 'shop_owner'
+          userRole = metaRole === 'admin' ? 'admin' : 'shop_owner'
         }
       }
     } catch {
       // Fallback
-      if (cleanEmail === 'sakib.samadhan@gmail.com' || cleanEmail.includes('admin')) {
+      if (cleanEmail === 'sakib.samadhan@gmail.com' || cleanEmail.includes('admin') || metaRole === 'shop_owner' || metaRole === 'admin') {
         isAuthorized = true
-        userRole = 'shop_owner'
+        userRole = metaRole === 'admin' ? 'admin' : 'shop_owner'
       }
     }
   }
@@ -109,11 +113,12 @@ export async function updateSession(request: NextRequest) {
     }
 
     // Role-Based Route Protection:
-    // 'staff' role cannot access /stradmn/stats, /stradmn/settings, or /stradmn/staff
+    // 'staff' role cannot access /stradmn/stats, /stradmn/settings, /stradmn/staff, or /stradmn/promotions
     const isRestrictedForStaff = (
       pathname.startsWith('/stradmn/stats') ||
       pathname.startsWith('/stradmn/settings') ||
-      pathname.startsWith('/stradmn/staff')
+      pathname.startsWith('/stradmn/staff') ||
+      pathname.startsWith('/stradmn/promotions')
     )
 
     if (userRole === 'staff' && isRestrictedForStaff) {

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createAdminClient } from '@/utils/supabase/server'
 import { getPublicSettings } from '@/utils/settings'
 import { CheckCircle2, ShoppingBag, Truck, Printer } from 'lucide-react'
+import OrderClaimAccountCard from '@/components/OrderClaimAccountCard'
 
 interface ConfirmProps {
   searchParams: Promise<{ order_id?: string; trx_id?: string }>
@@ -54,8 +55,21 @@ export default async function OrderConfirmationPage({ searchParams }: ConfirmPro
     .select('*, products(name)')
     .eq('order_id', order.id)
 
-  const codToCollect = order.payment_method === 'COD' 
-    ? Number(order.total_price) - Number(order.delivery_charge)
+  const itemsSubtotal = (orderItems || []).reduce((sum: number, it: any) => sum + Number(it.price) * it.quantity, 0)
+  const discountAmount = Number(order.discount_amount || 0)
+  const deliveryCharge = Number(order.delivery_charge || 0)
+  const totalPrice = Number(order.total_price || 0)
+
+  const isPersonal = order.payment_method === 'BKASH_PERSONAL'
+  const isCod = order.payment_method === 'COD'
+  const isPendingVerification = order.payment_status === 'Pending Verification'
+
+  const customAdvance = order.payment_details?.advance_paid !== undefined
+    ? Number(order.payment_details.advance_paid)
+    : (isCod ? deliveryCharge : totalPrice)
+
+  const codToCollect = isCod
+    ? Math.max(0, totalPrice - (isPendingVerification ? deliveryCharge : customAdvance))
     : 0
 
   const courierName = order.shipping_provider === 'steadfast' ? 'Steadfast Courier' : 'Pathao Courier'
@@ -78,13 +92,20 @@ export default async function OrderConfirmationPage({ searchParams }: ConfirmPro
           <div className="rounded-xl bg-slate-50 border border-slate-200 p-5 text-left text-xs space-y-2.5">
             <div className="flex justify-between border-b border-slate-200/60 pb-2">
               <span className="text-slate-500">Order ID:</span>
-              <span className="font-mono font-bold text-slate-900">{order.id}</span>
+              <span className="font-mono font-bold text-slate-900">#{order.id.slice(0, 8).toUpperCase()}</span>
             </div>
-            
-            <div className="flex justify-between border-b border-slate-200/60 pb-2">
-              <span className="text-slate-500">bKash Transaction ID:</span>
-              <span className="font-mono font-bold text-slate-900">{trx_id || 'Completed'}</span>
-            </div>
+
+            {order.payment_details?.transaction_id ? (
+              <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                <span className="text-slate-500">bKash TrxID:</span>
+                <span className="font-mono font-bold text-pink-700 uppercase">{order.payment_details.transaction_id}</span>
+              </div>
+            ) : trx_id ? (
+              <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                <span className="text-slate-500">bKash Transaction ID:</span>
+                <span className="font-mono font-bold text-slate-900">{trx_id}</span>
+              </div>
+            ) : null}
 
             <div className="flex justify-between border-b border-slate-200/60 pb-2">
               <span className="text-slate-500">Customer:</span>
@@ -92,19 +113,71 @@ export default async function OrderConfirmationPage({ searchParams }: ConfirmPro
             </div>
 
             <div className="flex justify-between border-b border-slate-200/60 pb-2">
-              <span className="text-slate-500">Payment Option:</span>
-              <span className="font-bold text-slate-900 uppercase">
-                {order.payment_method === 'COD' ? 'Cash on Delivery (COD)' : 'Fully Prepaid via bKash'}
+              <span className="text-slate-500">Payment Method:</span>
+              <span className="font-bold text-slate-900">
+                {isPersonal ? (
+                  <span className="text-pink-600">bKash Personal (Send Money)</span>
+                ) : isCod ? (
+                  'Cash on Delivery (COD)'
+                ) : (
+                  'bKash Online Gateway'
+                )}
               </span>
             </div>
 
-            <div className="flex justify-between text-sm pt-1">
-              <span className="text-slate-900 font-bold">Total Paid Now:</span>
-              <span className="font-black text-brand-700">
-                ৳{Number(order.payment_method === 'COD' ? order.delivery_charge : order.total_price).toLocaleString()}
+            {/* Price Calculations */}
+            <div className="space-y-1.5 pt-1 border-b border-slate-200/60 pb-2 text-slate-600">
+              <div className="flex justify-between">
+                <span>Products Subtotal:</span>
+                <span>৳{itemsSubtotal.toLocaleString()}</span>
+              </div>
+
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-emerald-600 font-bold">
+                  <span>Promo Discount {order.promo_code ? `(${order.promo_code})` : ''}:</span>
+                  <span>-৳{discountAmount.toLocaleString()}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between">
+                <span>Delivery Fee:</span>
+                <span>৳{deliveryCharge.toLocaleString()}</span>
+              </div>
+
+              <div className="flex justify-between font-bold text-slate-900 pt-1 border-t border-slate-200/40">
+                <span>Total Order Amount:</span>
+                <span>৳{totalPrice.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center text-sm pt-1">
+              <span className="text-slate-900 font-bold">
+                {isCod ? 'Advance Delivery Fee:' : 'Paid via bKash:'}
               </span>
+              <div className="text-right">
+                <span className="font-black text-brand-700 block">
+                  ৳{(isCod ? deliveryCharge : totalPrice).toLocaleString()}
+                </span>
+                {isPendingVerification && (
+                  <span className="text-[10px] text-pink-600 font-bold block">
+                    (Pending Verification)
+                  </span>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Guest Account Claim Card (If guest order) */}
+          <OrderClaimAccountCard
+            orderId={order.id}
+            customerName={order.customer_name}
+            customerPhone={order.customer_phone}
+            customerEmail={order.customer_email}
+            shippingAddress={order.shipping_address}
+            cityId={order.city_id}
+            zoneId={order.zone_id}
+            areaId={order.area_id}
+          />
 
           {/* Order Items Table */}
           <div className="rounded-xl bg-white border border-slate-200 overflow-hidden text-left text-xs">
@@ -144,15 +217,15 @@ export default async function OrderConfirmationPage({ searchParams }: ConfirmPro
               <Truck className="h-4 w-4 text-blue-700" />
               <span>Courier Delivery Details:</span>
             </div>
-            {order.payment_method === 'COD' ? (
+            {isCod ? (
               <p className="leading-relaxed">
-                Your delivery charge is confirmed. Your order will be dispatched via <strong>{courierName}</strong>. 
-                Please keep <strong>৳{codToCollect.toLocaleString()}</strong> cash ready upon delivery.
+                Your order is confirmed and will be dispatched via <strong>{courierName}</strong>. 
+                Please keep <strong>৳{codToCollect.toLocaleString()}</strong> cash ready upon doorstep delivery.
               </p>
             ) : (
               <p className="leading-relaxed">
-                Your order is fully prepaid. Your order will be dispatched via <strong>{courierName}</strong>. 
-                Your COD balance is <strong>৳0</strong>.
+                Your order is fully prepaid and will be dispatched via <strong>{courierName}</strong>. 
+                Your COD balance on delivery is <strong>৳0</strong>.
               </p>
             )}
             

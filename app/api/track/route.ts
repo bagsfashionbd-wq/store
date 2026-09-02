@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
+import { checkSteadfastStatus, checkPathaoStatus } from '@/utils/courier'
+import { restoreOrderInventory } from '@/utils/inventory'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,6 +69,52 @@ export async function GET(request: NextRequest) {
             o.id.replace(/-/g, '').toLowerCase().startsWith(cleanQuery) ||
             (o.customer_phone && o.customer_phone.includes(rawQuery))
           )
+        }
+      }
+    }
+
+    // Live Sync with Courier for active shipments
+    if (orders.length > 0) {
+      for (const order of orders) {
+        const isCompleted = order.order_status === 'Completed' || order.order_status === 'Delivered' || order.order_status === 'Cancelled'
+        const hasConsignment = order.steadfast_consignment_id || order.pathao_consignment_id
+
+        if (!isCompleted && hasConsignment) {
+          try {
+            let deliveryStatus = ''
+            if (order.steadfast_consignment_id) {
+              const res = await checkSteadfastStatus(order.steadfast_consignment_id, order.steadfast_tracking_code)
+              deliveryStatus = res.delivery_status
+            } else if (order.pathao_consignment_id) {
+              const res = await checkPathaoStatus(order.pathao_consignment_id)
+              deliveryStatus = res.delivery_status
+            }
+
+            const s = deliveryStatus.toLowerCase().replace(/[-_]/g, ' ').trim()
+
+            if (s.includes('delivered') || s.includes('partial delivered') || s.includes('payment invoice settled') || s.includes('payment settled')) {
+              order.order_status = 'Completed'
+              order.payment_status = 'FullyPaid'
+              order.pathao_status = 'delivered'
+              await adminDb.from('orders').update({
+                order_status: 'Completed',
+                payment_status: 'FullyPaid',
+                pathao_status: 'delivered'
+              }).eq('id', order.id)
+            } else if (s.includes('return') || s.includes('cancelled') || s.includes('canceled')) {
+              if (order.order_status !== 'Cancelled') {
+                await restoreOrderInventory(adminDb, order.id)
+              }
+              order.order_status = 'Cancelled'
+              order.pathao_status = 'returned'
+              await adminDb.from('orders').update({
+                order_status: 'Cancelled',
+                pathao_status: 'returned'
+              }).eq('id', order.id)
+            }
+          } catch (err: any) {
+            console.warn(`Track live courier sync failed for ${order.id}:`, err.message)
+          }
         }
       }
     }

@@ -2,14 +2,16 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
-import { ShoppingBag, ChevronRight, Truck, Check, AlertCircle, ArrowLeft, ArrowRight, Play } from 'lucide-react'
+import { ShoppingBag, ChevronRight, Truck, Check, AlertCircle, ArrowLeft, ArrowRight, Play, Heart } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import CartDrawer from '@/components/CartDrawer'
 import { useCart } from '@/context/CartContext'
+import { useCustomer } from '@/context/CustomerContext'
 import { useStore } from '@/context/StoreContext'
 import { parseProductVariations, VariationOption } from '@/components/AdminProductsClient'
 import ProductCard from '@/components/ProductCard'
+import { useLanguage } from '@/context/LanguageContext'
 
 interface Product {
   id: string
@@ -41,7 +43,20 @@ interface ProductDetailClientProps {
 
 export default function ProductDetailClient({ product, categories, relatedProducts = [] }: ProductDetailClientProps) {
   const { addToCart } = useCart()
+  const { toggleWishlist, isInWishlist } = useCustomer()
   const { settings } = useStore()
+  const { t, toBengaliDigits, isBangla } = useLanguage()
+  const [guestToast, setGuestToast] = useState(false)
+  
+  const isWishlisted = isInWishlist(product.id)
+
+  const handleWishlistToggle = async () => {
+    const res = await toggleWishlist(product.id)
+    if (res.isGuest && res.added) {
+      setGuestToast(true)
+      setTimeout(() => setGuestToast(false), 3500)
+    }
+  }
   
   const parsedOptions: VariationOption[] = parseProductVariations(product.variations, product.stock)
   
@@ -95,7 +110,21 @@ export default function ProductDetailClient({ product, categories, relatedProduc
     return minStock === Infinity ? product.stock : minStock
   }
 
+  // Calculate dynamic variant price override (if selected option specifies a custom price)
+  const computeActivePrice = () => {
+    let activePrice = Number(product.price)
+    parsedOptions.forEach((opt) => {
+      const selectedLabel = selectedVariations[opt.name]
+      const valObj = opt.values.find((v) => v.label === selectedLabel)
+      if (valObj && valObj.price !== undefined && valObj.price !== null && Number(valObj.price) > 0) {
+        activePrice = Number(valObj.price)
+      }
+    })
+    return activePrice
+  }
+
   const currentStock = computeSelectedStock()
+  const activePrice = computeActivePrice()
   const isAvailable = currentStock > 0
 
   const handleAddToCart = () => {
@@ -105,13 +134,15 @@ export default function ProductDetailClient({ product, categories, relatedProduc
       id: product.id,
       name: product.name,
       slug: product.slug,
-      price: Number(product.price),
+      price: activePrice,
       image: selectedMedia || product.images[0] || 'https://images.unsplash.com/photo-1522069169874-c58ec4b76be5',
       selectedVariations
     }, quantity)
     
     setCartDrawerOpen(true)
   }
+
+  const isRichDescription = product.description && /<[a-z][\s\S]*>/i.test(product.description)
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -210,7 +241,7 @@ export default function ProductDetailClient({ product, categories, relatedProduc
 
             {/* Price Box */}
             <div className="flex items-baseline gap-3 py-3 border-y border-slate-200">
-              <span className="text-3xl font-black text-slate-950">৳{Number(product.price).toLocaleString()}</span>
+              <span className="text-3xl font-black text-slate-950">৳{activePrice.toLocaleString()}</span>
               {product.old_price > 0 && (
                 <span className="text-lg text-slate-400 line-through font-semibold">
                   ৳{Number(product.old_price).toLocaleString()}
@@ -219,8 +250,16 @@ export default function ProductDetailClient({ product, categories, relatedProduc
             </div>
 
             {/* Description */}
-            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{product.description}</p>
+            {isRichDescription ? (
+              <div
+                className="prose prose-sm max-w-none text-slate-600 leading-relaxed font-normal"
+                dangerouslySetInnerHTML={{ __html: product.description }}
+              />
+            ) : (
+              <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{product.description}</p>
+            )}
 
+            {/* Dynamic Variations Selectors */}
             {/* Dynamic Variations Selectors */}
             {parsedOptions.length > 0 && (
               <div className="space-y-5 pt-2">
@@ -228,7 +267,7 @@ export default function ProductDetailClient({ product, categories, relatedProduc
                   <div key={opt.name} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-                        Select {opt.name}:
+                        {isBangla ? `${opt.name} নির্বাচন করুন:` : `Select ${opt.name}:`}
                       </label>
                       {selectedVariations[opt.name] && (
                         <span className="text-xs font-bold text-brand-600">
@@ -262,7 +301,7 @@ export default function ProductDetailClient({ product, categories, relatedProduc
                             <span>{val.label}</span>
                             {isSoldOut && (
                               <span className="text-[9px] bg-slate-200 text-slate-500 px-1 py-0.2 rounded uppercase">
-                                Sold Out
+                                {t('product.out_of_stock')}
                               </span>
                             )}
                           </button>
@@ -281,14 +320,18 @@ export default function ProductDetailClient({ product, categories, relatedProduc
                   <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-50 text-brand-600">
                     <Check className="h-4 w-4" />
                   </span>
-                  <span className="text-brand-700 font-bold">{currentStock} units available in stock</span>
+                  <span className="text-brand-700 font-bold">
+                    {isBangla ? `${toBengaliDigits(currentStock)} টি পণ্য স্টকে উপলব্ধ রয়েছে` : `${currentStock} units available in stock`}
+                  </span>
                 </>
               ) : (
                 <>
                   <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-50 text-red-600">
                     <AlertCircle className="h-4 w-4" />
                   </span>
-                  <span className="text-red-700 font-bold">This option is currently out of stock</span>
+                  <span className="text-red-700 font-bold">
+                    {isBangla ? 'এই অপশনটি বর্তমানে স্টক শেষ' : 'This option is currently out of stock'}
+                  </span>
                 </>
               )}
             </div>
@@ -305,7 +348,9 @@ export default function ProductDetailClient({ product, categories, relatedProduc
                   >
                     -
                   </button>
-                  <span className="text-sm font-bold text-slate-900">{quantity}</span>
+                  <span className="text-sm font-bold text-slate-900">
+                    {isBangla ? toBengaliDigits(quantity) : quantity}
+                  </span>
                   <button
                     type="button"
                     onClick={() => setQuantity(Math.min(currentStock, quantity + 1))}
@@ -322,8 +367,35 @@ export default function ProductDetailClient({ product, categories, relatedProduc
                   className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-3 text-base font-bold text-white shadow-lg hover:bg-brand-500 transition-all duration-200 h-12"
                 >
                   <ShoppingBag className="h-5 w-5" />
-                  Add to Shopping Cart
+                  {t('product.add_to_cart')}
                 </button>
+
+                {/* Wishlist Button */}
+                <button
+                  type="button"
+                  onClick={handleWishlistToggle}
+                  className={`flex items-center justify-center gap-2 px-4 rounded-xl border-2 transition h-12 font-bold text-xs ${
+                    isWishlisted
+                      ? 'border-pink-500 bg-pink-50 text-pink-600'
+                      : 'border-slate-200 hover:border-pink-300 hover:bg-pink-50/50 text-slate-700'
+                  }`}
+                  title={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                >
+                  <Heart className={`h-5 w-5 ${isWishlisted ? 'fill-current text-pink-600' : 'text-slate-500'}`} />
+                  <span className="hidden sm:inline">
+                    {isWishlisted
+                      ? (isBangla ? 'পছন্দে রাখা আছে' : 'Wishlisted')
+                      : (isBangla ? 'পছন্দে রাখুন' : 'Wishlist')}
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {/* Guest Wishlist Reminder Alert */}
+            {guestToast && (
+              <div className="p-3 rounded-xl bg-slate-900 text-white text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                <Heart className="h-4 w-4 text-pink-400 fill-current" />
+                <span>{isBangla ? 'পছন্দের তালিকায় যুক্ত হয়েছে! স্থায়ীভাবে সংরক্ষণ করতে লগইন করুন।' : 'Added to wishlist! Sign in to keep it saved permanently.'}</span>
               </div>
             )}
 
@@ -331,17 +403,18 @@ export default function ProductDetailClient({ product, categories, relatedProduc
             <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 mt-6 text-xs text-slate-700 space-y-1.5">
               <div className="flex items-center gap-2 font-bold text-slate-900">
                 <Truck className="h-4 w-4 text-brand-600" />
-                <span>Nationwide Express Doorstep Delivery</span>
+                <span>{t('hero.fast_delivery')}</span>
               </div>
               <p className="leading-relaxed text-slate-500">
-                Fast and reliable doorstep delivery across Bangladesh. 
-                Delivery charge is ৳{settings.delivery_charge_inside_dhaka} inside Dhaka, and ৳{settings.delivery_charge_outside_dhaka} outside Dhaka.
+                {isBangla
+                  ? `সারা বাংলাদেশে দ্রুত ও নিরাপদ হোম ডেলিভারি। ডেলিভারি চার্জ ঢাকার ভিতরে ৳${toBengaliDigits(settings.delivery_charge_inside_dhaka || 0)} এবং ঢাকার বাইরে ৳${toBengaliDigits(settings.delivery_charge_outside_dhaka || 0)}।`
+                  : `Fast and reliable doorstep delivery across Bangladesh. Delivery charge is ৳${settings.delivery_charge_inside_dhaka} inside Dhaka, and ৳${settings.delivery_charge_outside_dhaka} outside Dhaka.`}
               </p>
             </div>
 
             <div className="pt-4">
               <Link href="/" className="text-xs font-bold text-brand-600 hover:text-brand-700 flex items-center gap-1">
-                <ArrowLeft className="h-4 w-4" /> Back to Catalog
+                <ArrowLeft className="h-4 w-4" /> {t('common.back')}
               </Link>
             </div>
 
@@ -352,7 +425,7 @@ export default function ProductDetailClient({ product, categories, relatedProduc
         {relatedProducts.length > 0 && (
           <div className="mt-14 sm:mt-20 pt-8 sm:pt-12 border-t border-slate-200 space-y-5">
             <div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-950">You May Also Like</h2>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-950">{t('product.related_products')}</h2>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
