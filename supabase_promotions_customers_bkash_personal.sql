@@ -9,6 +9,10 @@ ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS bkash_personal_name V
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS bkash_personal_qr_url TEXT DEFAULT '';
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS resend_api_key VARCHAR(255) DEFAULT '';
 ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS resend_from_email VARCHAR(255) DEFAULT '';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS email_invoice_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS daily_digest_enabled BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS daily_digest_time VARCHAR(10) DEFAULT '20:00';
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS daily_digest_email VARCHAR(255) DEFAULT '';
 
 -- 2. CREATE CUSTOMERS TABLE (Customer accounts separated from staff)
 CREATE TABLE IF NOT EXISTS public.customers (
@@ -70,15 +74,21 @@ CREATE TABLE IF NOT EXISTS public.promo_codes (
     discount_value NUMERIC(10,2) NOT NULL DEFAULT 0,
     min_order_amount NUMERIC(10,2) DEFAULT 0,
     max_discount NUMERIC(10,2) DEFAULT 0,      -- 0 = no cap for percentage
-    usage_limit INT DEFAULT 0,                 -- 0 = unlimited
+    usage_limit INT DEFAULT 0,                 -- 0 = unlimited store-wide
+    per_user_limit INT DEFAULT 0,              -- 0 = unlimited per customer, 1 = single-use
     usage_count INT DEFAULT 0,
     included_product_ids UUID[] DEFAULT '{}',   -- Empty = applies to all products
     excluded_product_ids UUID[] DEFAULT '{}',
+    included_category_ids UUID[] DEFAULT '{}',  -- Empty = applies to all categories
+    excluded_category_ids UUID[] DEFAULT '{}',
     is_active BOOLEAN DEFAULT TRUE,
     start_date TIMESTAMPTZ DEFAULT NOW(),
     end_date TIMESTAMPTZ DEFAULT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.promo_codes ADD COLUMN IF NOT EXISTS per_user_limit INT DEFAULT 0;
+ALTER TABLE public.promo_codes ADD COLUMN IF NOT EXISTS included_category_ids UUID[] DEFAULT '{}';
+ALTER TABLE public.promo_codes ADD COLUMN IF NOT EXISTS excluded_category_ids UUID[] DEFAULT '{}';
 CREATE INDEX IF NOT EXISTS idx_promo_codes_code ON public.promo_codes(code);
 CREATE INDEX IF NOT EXISTS idx_promo_codes_is_active ON public.promo_codes(is_active);
 

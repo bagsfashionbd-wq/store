@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { verifyStaffAuth } from '@/utils/auth'
 import { restoreOrderInventory, deductOrderInventory, restoreProductStock, deductProductStock } from '@/utils/inventory'
+import { sendOrderDispatchedEmail, sendOrderCancelledEmail } from '@/utils/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -192,6 +193,49 @@ export async function PUT(request: NextRequest) {
 
     if (reloadError || !updatedOrder) {
       return NextResponse.json({ error: 'Failed to reload updated order' }, { status: 500 })
+    }
+
+    // 8. Trigger customer email notification on status change
+    const targetEmail = updatedOrder.customer_email || existingOrder.customer_email
+    if (targetEmail && oldStatus !== newStatus) {
+      if (newStatus === 'Cancelled') {
+        sendOrderCancelledEmail({
+          toEmail: targetEmail,
+          customerName: updatedOrder.customer_name,
+          orderId: updatedOrder.id,
+          totalPrice: Number(updatedOrder.total_price)
+        }).catch(err => console.error('[Email] Order cancelled email error:', err))
+      } else if (newStatus === 'Shipped') {
+        const courierLabel = updatedOrder.shipping_provider === 'pathao'
+          ? 'Pathao Courier'
+          : updatedOrder.shipping_provider === 'steadfast'
+          ? 'Steadfast Courier'
+          : 'Store Courier / Local Delivery'
+
+        let codAmount = 0
+        if (updatedOrder.payment_status === 'FullyPaid') {
+          codAmount = 0
+        } else if (updatedOrder.payment_details?.advance_paid !== undefined) {
+          codAmount = Math.max(0, Number(updatedOrder.total_price) - Number(updatedOrder.payment_details.advance_paid))
+        } else if (updatedOrder.payment_status === 'DeliveryChargePrePaid') {
+          codAmount = Math.max(0, Number(updatedOrder.total_price) - Number(updatedOrder.delivery_charge))
+        } else {
+          codAmount = Number(updatedOrder.total_price)
+        }
+
+        sendOrderDispatchedEmail({
+          toEmail: targetEmail,
+          customerName: updatedOrder.customer_name,
+          orderId: updatedOrder.id,
+          courierName: courierLabel,
+          consignmentId: updatedOrder.pathao_consignment_id || updatedOrder.steadfast_consignment_id,
+          trackingCode: updatedOrder.steadfast_tracking_code,
+          shippingAddress: updatedOrder.shipping_address,
+          totalPrice: Number(updatedOrder.total_price),
+          codAmount,
+          paymentStatus: updatedOrder.payment_status
+        }).catch(err => console.error('[Email] Order dispatched email error:', err))
+      }
     }
 
     return NextResponse.json({ success: true, data: updatedOrder })

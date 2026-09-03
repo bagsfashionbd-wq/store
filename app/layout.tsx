@@ -19,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const settings = await getPublicSettings()
   const iconUrl = settings.favicon_url || settings.logo_url || '/logo.jpeg'
 
-  return {
+  const metadata: Metadata = {
     title: `${settings.store_name} - ${settings.store_tagline || 'Online Store'}`,
     description: settings.hero_description || 'Your one-stop online shop in Bangladesh.',
     icons: {
@@ -28,6 +28,22 @@ export async function generateMetadata(): Promise<Metadata> {
       apple: iconUrl,
     }
   }
+
+  const verification: Record<string, any> = {}
+  if (settings.google_site_verification && settings.google_site_verification.trim()) {
+    verification.google = settings.google_site_verification.trim()
+  }
+  if (settings.meta_domain_verification && settings.meta_domain_verification.trim()) {
+    verification.other = {
+      'facebook-domain-verification': settings.meta_domain_verification.trim()
+    }
+  }
+
+  if (Object.keys(verification).length > 0) {
+    metadata.verification = verification
+  }
+
+  return metadata
 }
 
 export default async function RootLayout({

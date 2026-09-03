@@ -218,7 +218,10 @@ export default function CheckoutPage() {
       const res = await axios.post('/api/promo/validate', {
         code: promoCodeInput.trim(),
         cartItems,
-        deliveryCharge
+        deliveryCharge,
+        customer_phone: customerPhone || customer?.phone || '',
+        customer_email: customerEmail || customer?.email || '',
+        user_id: customer?.user_id || customer?.id || null
       })
 
       if (res.data?.valid) {

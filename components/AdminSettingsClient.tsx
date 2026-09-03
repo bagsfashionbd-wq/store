@@ -14,8 +14,8 @@ import AdminSidebar from '@/components/AdminSidebar'
 import {
   BarChart3, ShoppingBag, Package, LogOut, Settings, Save,
   Check, AlertCircle, RefreshCw, Upload, Sparkles, Truck,
-  CreditCard, Palette, Layout, ExternalLink, Layers, Info, MapPin, Phone, Mail, MessageSquare, Eye,
-  Share2, MessageCircle, Globe, Smartphone, X, Clock, Send, Loader2
+  CreditCard, Palette, Layout, ExternalLink, Layers, Info, MapPin, Phone, Mail, MessageSquare, Eye, EyeOff,
+  Share2, MessageCircle, Globe, Smartphone, X, Clock, Send, Loader2, Code, ShieldCheck, CheckCircle2
 } from 'lucide-react'
 import axios from 'axios'
 
@@ -29,12 +29,52 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
   const { t, isBangla } = useLanguage()
 
   const [settings, setSettings] = useState<StoreSettings>(initialSettings)
-  const [activeTab, setActiveTab] = useState<'branding' | 'hero' | 'collections' | 'payment' | 'shipping' | 'tracking' | 'about'>('branding')
+  const [activeTab, setActiveTab] = useState<'branding' | 'hero' | 'collections' | 'payment' | 'shipping' | 'emails' | 'tracking' | 'about'>('branding')
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [bkashWarningModal, setBkashWarningModal] = useState(false)
   const [testDigestLoading, setTestDigestLoading] = useState(false)
+
+  // Password Visibility Toggles
+  const [showBkashPassword, setShowBkashPassword] = useState(false)
+  const [showPathaoPassword, setShowPathaoPassword] = useState(false)
+
+  // Pathao Dynamic Store Fetching
+  const [pathaoStores, setPathaoStores] = useState<Array<{ store_id: number; store_name: string; store_address?: string }>>([])
+  const [loadingPathaoStores, setLoadingPathaoStores] = useState(false)
+  const [pathaoVerifyError, setPathaoVerifyError] = useState('')
+  const [pathaoVerifySuccess, setPathaoVerifySuccess] = useState(false)
+
+  const handleFetchPathaoStores = async () => {
+    setLoadingPathaoStores(true)
+    setPathaoVerifyError('')
+    setPathaoVerifySuccess(false)
+    try {
+      const res = await axios.post('/api/pathao', {
+        pathao_api_url: settings.pathao_api_url,
+        pathao_client_id: settings.pathao_client_id,
+        pathao_client_secret: settings.pathao_client_secret,
+        pathao_username: settings.pathao_username,
+        pathao_password: settings.pathao_password,
+      })
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        setPathaoStores(res.data.data)
+        setPathaoVerifySuccess(true)
+        if (res.data.data.length > 0 && !settings.pathao_store_id) {
+          setSettings(prev => ({ ...prev, pathao_store_id: String(res.data.data[0].store_id) }))
+        }
+        setTimeout(() => setPathaoVerifySuccess(false), 5000)
+      } else {
+        throw new Error(res.data?.error || 'Failed to fetch Pathao stores')
+      }
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || err.message || 'Failed to connect to Pathao.'
+      setPathaoVerifyError(errorMsg)
+    } finally {
+      setLoadingPathaoStores(false)
+    }
+  }
 
   const handleSendTestDailyDigest = async () => {
     setTestDigestLoading(true)
@@ -129,8 +169,8 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
             <button
               onClick={() => setActiveTab('branding')}
               className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${activeTab === 'branding'
-                  ? 'border-brand-600 text-brand-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
                 }`}
             >
               <Palette className="h-4 w-4" /> Branding & Theme
@@ -138,8 +178,8 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
             <button
               onClick={() => setActiveTab('hero')}
               className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${activeTab === 'hero'
-                  ? 'border-brand-600 text-brand-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
                 }`}
             >
               <Layout className="h-4 w-4" /> Hero Banner
@@ -147,8 +187,8 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
             <button
               onClick={() => setActiveTab('collections')}
               className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${activeTab === 'collections'
-                  ? 'border-brand-600 text-brand-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
                 }`}
             >
               <Sparkles className="h-4 w-4" /> Collections & Showcase
@@ -156,8 +196,8 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
             <button
               onClick={() => setActiveTab('payment')}
               className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${activeTab === 'payment'
-                  ? 'border-brand-600 text-brand-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
                 }`}
             >
               <CreditCard className="h-4 w-4" /> Payment
@@ -165,17 +205,26 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
             <button
               onClick={() => setActiveTab('shipping')}
               className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${activeTab === 'shipping'
-                  ? 'border-brand-600 text-brand-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
                 }`}
             >
               <Truck className="h-4 w-4" /> Courier & Shipping
             </button>
             <button
+              onClick={() => setActiveTab('emails')}
+              className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${activeTab === 'emails'
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+                }`}
+            >
+              <Mail className="h-4 w-4" /> Automated Emails
+            </button>
+            <button
               onClick={() => setActiveTab('tracking')}
               className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${activeTab === 'tracking'
-                  ? 'border-brand-600 text-brand-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
                 }`}
             >
               <Share2 className="h-4 w-4" /> Ads & Social
@@ -183,8 +232,8 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
             <button
               onClick={() => setActiveTab('about')}
               className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 whitespace-nowrap transition ${activeTab === 'about'
-                  ? 'border-brand-600 text-brand-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
                 }`}
             >
               <Info className="h-4 w-4" /> About & Contact
@@ -296,8 +345,8 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                         type="button"
                         onClick={() => setSettings({ ...settings, theme_color: palette.id })}
                         className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition ${settings.theme_color === palette.id
-                            ? 'border-slate-900 bg-slate-50 shadow-sm ring-2 ring-slate-900/10'
-                            : 'border-slate-200 hover:border-slate-300'
+                          ? 'border-slate-900 bg-slate-50 shadow-sm ring-2 ring-slate-900/10'
+                          : 'border-slate-200 hover:border-slate-300'
                           }`}
                       >
                         <span
@@ -937,12 +986,22 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                           </div>
                           <div>
                             <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Password *</label>
-                            <input
-                              type="password"
-                              value={settings.bkash_password}
-                              onChange={(e) => setSettings({ ...settings, bkash_password: e.target.value })}
-                              className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono bg-white"
-                            />
+                            <div className="relative">
+                              <input
+                                type={showBkashPassword ? 'text' : 'password'}
+                                value={settings.bkash_password}
+                                onChange={(e) => setSettings({ ...settings, bkash_password: e.target.value })}
+                                className="w-full rounded border border-slate-200 pl-3 pr-9 py-2 text-xs outline-none focus:border-brand-500 font-mono bg-white"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowBkashPassword(!showBkashPassword)}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                title={showBkashPassword ? 'Hide password' : 'Show password'}
+                              >
+                                {showBkashPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1165,56 +1224,152 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                     {/* PATHAO CREDENTIALS (RENDERED WHEN PATHAO IS ON) */}
                     {settings.pathao_enabled && (
                       <div className="space-y-4 pt-4 border-t border-slate-200/80 animate-fadeIn">
-                        <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
-                          <Truck className="h-4 w-4 text-brand-600" /> Pathao Aladdin API Credentials
-                        </h3>
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                            <Truck className="h-4 w-4 text-brand-600" /> Pathao Aladdin API Credentials
+                          </h3>
+                          <a
+                            href="https://merchant.pathao.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] font-bold text-brand-600 hover:underline inline-flex items-center gap-1"
+                          >
+                            <span>Pathao Merchant Portal</span>
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </div>
+
+                        {/* Environment selector */}
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                            Pathao API Environment *
+                          </label>
+                          <select
+                            value={settings.pathao_api_url || 'https://api-hermes.pathao.com'}
+                            onChange={(e) => setSettings({ ...settings, pathao_api_url: e.target.value })}
+                            className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-medium"
+                          >
+                            <option value="https://api-hermes.pathao.com">Live Production (https://api-hermes.pathao.com)</option>
+                            <option value="https://courier-api-sandbox.pathao.com">Developer Sandbox (https://courier-api-sandbox.pathao.com)</option>
+                          </select>
+                        </div>
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {/* Client ID (Normal text) */}
                           <div>
                             <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Client ID *</label>
                             <input
-                              type="password"
-                              value={settings.pathao_client_id}
+                              type="text"
+                              value={settings.pathao_client_id || ''}
                               onChange={(e) => setSettings({ ...settings, pathao_client_id: e.target.value })}
+                              placeholder="e.g. 102"
                               className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono bg-white"
                             />
                           </div>
+
+                          {/* Client Secret (Masked) */}
                           <div>
                             <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Client Secret *</label>
                             <input
                               type="password"
-                              value={settings.pathao_client_secret}
+                              value={settings.pathao_client_secret || ''}
                               onChange={(e) => setSettings({ ...settings, pathao_client_secret: e.target.value })}
+                              placeholder="••••••••••••••••"
                               className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono bg-white"
                             />
                           </div>
+
+                          {/* Username (Email/Phone) */}
                           <div>
                             <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Merchant Username / Email *</label>
                             <input
                               type="text"
-                              value={settings.pathao_username}
+                              value={settings.pathao_username || ''}
                               onChange={(e) => setSettings({ ...settings, pathao_username: e.target.value })}
+                              placeholder="merchant@example.com"
                               className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono bg-white"
                             />
                           </div>
+
+                          {/* Password (With Eye Toggle) */}
                           <div>
                             <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Password *</label>
-                            <input
-                              type="password"
-                              value={settings.pathao_password}
-                              onChange={(e) => setSettings({ ...settings, pathao_password: e.target.value })}
-                              className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono bg-white"
-                            />
+                            <div className="relative">
+                              <input
+                                type={showPathaoPassword ? 'text' : 'password'}
+                                value={settings.pathao_password || ''}
+                                onChange={(e) => setSettings({ ...settings, pathao_password: e.target.value })}
+                                placeholder="••••••••"
+                                className="w-full rounded border border-slate-200 pl-3 pr-9 py-2 text-xs outline-none focus:border-brand-500 font-mono bg-white"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPathaoPassword(!showPathaoPassword)}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                title={showPathaoPassword ? 'Hide password' : 'Show password'}
+                              >
+                                {showPathaoPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                              </button>
+                            </div>
                           </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Store ID *</label>
+                        </div>
+
+                        {/* Store Selector & Verification */}
+                        <div className="pt-2 border-t border-slate-200/80 space-y-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <label className="block text-xs font-semibold text-slate-700 uppercase">
+                              Pathao Pickup Store ID *
+                            </label>
+                            <button
+                              type="button"
+                              onClick={handleFetchPathaoStores}
+                              disabled={loadingPathaoStores}
+                              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-bold transition disabled:opacity-50"
+                            >
+                              {loadingPathaoStores ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                              <span>{loadingPathaoStores ? 'Verifying & Fetching Stores...' : 'Fetch Stores from Pathao'}</span>
+                            </button>
+                          </div>
+
+                          {pathaoVerifyError && (
+                            <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                              <span>{pathaoVerifyError}</span>
+                            </div>
+                          )}
+
+                          {pathaoVerifySuccess && (
+                            <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex items-center gap-2">
+                              <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                              <span>Connected to Pathao! {pathaoStores.length} store(s) found.</span>
+                            </div>
+                          )}
+
+                          {pathaoStores.length > 0 ? (
+                            <select
+                              value={settings.pathao_store_id || ''}
+                              onChange={(e) => setSettings({ ...settings, pathao_store_id: e.target.value })}
+                              className="w-full rounded border border-brand-500 ring-1 ring-brand-500 px-3 py-2 text-xs outline-none bg-white font-medium"
+                            >
+                              <option value="">Select your pickup store</option>
+                              {pathaoStores.map((s) => (
+                                <option key={s.store_id} value={s.store_id}>
+                                  {s.store_name} (ID: {s.store_id}) {s.store_address ? `- ${s.store_address}` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
                             <input
                               type="text"
-                              value={settings.pathao_store_id}
+                              value={settings.pathao_store_id || ''}
                               onChange={(e) => setSettings({ ...settings, pathao_store_id: e.target.value })}
-                              placeholder="e.g. 150506"
+                              placeholder="e.g. 150506 (or click 'Fetch Stores from Pathao' above)"
                               className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 font-mono bg-white"
                             />
-                          </div>
+                          )}
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Click <strong>Fetch Stores from Pathao</strong> to verify your credentials and automatically populate your exact registered store ID.
+                          </p>
                         </div>
                       </div>
                     )}
@@ -1578,190 +1733,35 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
             </div>
           )}
 
-          {/* TAB: ADS & TRACKING PIXELS */}
-          {activeTab === 'tracking' && (
+          {/* TAB: AUTOMATED EMAILS & NOTIFICATIONS */}
+          {activeTab === 'emails' && (
             <div className="bg-white rounded-b-lg border border-t-0 border-slate-200 p-6 space-y-8 shadow-sm">
               <div className="max-w-2xl space-y-6">
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900">Marketing, Ads Tracking Pixels & Social Channels</h2>
+                  <h2 className="text-sm font-bold text-slate-900">Email Service Integration & Customer Notifications</h2>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Connect your Facebook & Instagram Meta Pixel, Google Analytics 4, TikTok Pixel, and official social media accounts.
+                    Connect Resend to send automated invoices, dispatch updates, cancellation alerts, and owner summaries.
                   </p>
                 </div>
 
-                {/* 1. AD PIXEL INTEGRATIONS */}
+                {/* 1. RESEND CREDENTIALS */}
                 <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
-                  <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
-                    <Sparkles className="h-4 w-4 text-brand-600" />
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                      Advertising & Analytics Pixels
-                    </h3>
-                  </div>
-
-                  {/* Meta (Facebook / Instagram) Pixel */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-700 uppercase flex items-center justify-between">
-                      <span>Meta Pixel ID (Facebook / Instagram Ads)</span>
-                      <span className="text-[10px] font-normal text-slate-400">e.g. 123456789012345</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.meta_pixel_id || ''}
-                      onChange={(e) => setSettings({ ...settings, meta_pixel_id: e.target.value })}
-                      placeholder="Paste your 15-16 digit Meta Pixel ID"
-                      className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
-                    />
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
-                      Find this in your <strong>Meta Events Manager</strong>. The pixel script will automatically inject into all storefront pages and track page views.
-                    </p>
-                  </div>
-
-                  {/* Google Analytics 4 (GA4) */}
-                  <div className="space-y-1.5 pt-2 border-t border-slate-200/60">
-                    <label className="block text-xs font-bold text-slate-700 uppercase flex items-center justify-between">
-                      <span>Google Analytics 4 Measurement ID</span>
-                      <span className="text-[10px] font-normal text-slate-400">e.g. G-XXXXXXXXXX</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.google_analytics_id || ''}
-                      onChange={(e) => setSettings({ ...settings, google_analytics_id: e.target.value })}
-                      placeholder="G-XXXXXXXXXX"
-                      className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
-                    />
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
-                      Find this in Google Analytics under <strong>Admin &gt; Data Streams &gt; Measurement ID</strong>.
-                    </p>
-                  </div>
-
-                  {/* TikTok Pixel */}
-                  <div className="space-y-1.5 pt-2 border-t border-slate-200/60">
-                    <label className="block text-xs font-bold text-slate-700 uppercase flex items-center justify-between">
-                      <span>TikTok Pixel ID</span>
-                      <span className="text-[10px] font-normal text-slate-400">e.g. CXXXXXXXXXXXXXXX</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.tiktok_pixel_id || ''}
-                      onChange={(e) => setSettings({ ...settings, tiktok_pixel_id: e.target.value })}
-                      placeholder="TikTok Pixel ID from TikTok Ads Manager"
-                      className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
-                    />
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
-                      Find this in TikTok Ads Manager under <strong>Assets &gt; Events &gt; Web Events</strong>.
-                    </p>
-                  </div>
-                </div>
-
-                {/* 2. SOCIAL MEDIA LINKS */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
-                  <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
-                    <Share2 className="h-4 w-4 text-brand-600" />
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                      Store Social Media Profiles
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Facebook */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        Facebook Page URL
-                      </label>
-                      <input
-                        type="text"
-                        value={settings.social_facebook || ''}
-                        onChange={(e) => setSettings({ ...settings, social_facebook: e.target.value })}
-                        onBlur={(e) => setSettings({ ...settings, social_facebook: formatExternalUrl(e.target.value) })}
-                        placeholder="https://facebook.com/yourpage"
-                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
-                      />
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-brand-600" />
+                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                        Resend API Configuration
+                      </h3>
                     </div>
-
-                    {/* Instagram */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        Instagram Profile URL
-                      </label>
-                      <input
-                        type="text"
-                        value={settings.social_instagram || ''}
-                        onChange={(e) => setSettings({ ...settings, social_instagram: e.target.value })}
-                        onBlur={(e) => setSettings({ ...settings, social_instagram: formatExternalUrl(e.target.value) })}
-                        placeholder="https://instagram.com/yourhandle"
-                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
-                      />
-                    </div>
-
-                    {/* YouTube */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        YouTube Channel URL
-                      </label>
-                      <input
-                        type="text"
-                        value={settings.social_youtube || ''}
-                        onChange={(e) => setSettings({ ...settings, social_youtube: e.target.value })}
-                        onBlur={(e) => setSettings({ ...settings, social_youtube: formatExternalUrl(e.target.value) })}
-                        placeholder="https://youtube.com/@yourchannel"
-                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
-                      />
-                    </div>
-
-                    {/* TikTok */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        TikTok Profile URL
-                      </label>
-                      <input
-                        type="text"
-                        value={settings.social_tiktok || ''}
-                        onChange={(e) => setSettings({ ...settings, social_tiktok: e.target.value })}
-                        onBlur={(e) => setSettings({ ...settings, social_tiktok: formatExternalUrl(e.target.value) })}
-                        placeholder="https://tiktok.com/@yourhandle"
-                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
-                      />
-                    </div>
-
-                    {/* Twitter / X */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        X (Twitter) Profile URL
-                      </label>
-                      <input
-                        type="text"
-                        value={settings.social_twitter || ''}
-                        onChange={(e) => setSettings({ ...settings, social_twitter: e.target.value })}
-                        onBlur={(e) => setSettings({ ...settings, social_twitter: formatExternalUrl(e.target.value) })}
-                        placeholder="https://x.com/yourhandle"
-                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
-                      />
-                    </div>
-
-                    {/* LinkedIn */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        LinkedIn Page URL
-                      </label>
-                      <input
-                        type="text"
-                        value={settings.social_linkedin || ''}
-                        onChange={(e) => setSettings({ ...settings, social_linkedin: e.target.value })}
-                        onBlur={(e) => setSettings({ ...settings, social_linkedin: formatExternalUrl(e.target.value) })}
-                        placeholder="https://linkedin.com/company/yourcompany"
-                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. RESEND EMAIL SERVICE INTEGRATION */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
-                  <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
-                    <Mail className="h-4 w-4 text-brand-600" />
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                      Email Service Integration (Resend)
-                    </h3>
+                    <a
+                      href="https://resend.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-bold text-brand-600 hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Get Free API Key</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
                   </div>
 
                   <div>
@@ -1776,13 +1776,13 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                       className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
                     />
                     <p className="text-[11px] text-slate-500 leading-relaxed mt-1">
-                      Used for automated customer invoices, order confirmations, and promotional email broadcasts. Free 100 emails/day at <a href="https://resend.com" target="_blank" rel="noreferrer" className="text-brand-600 underline">resend.com</a>.
+                      Free 100 emails/day and 3,000 emails/month on <a href="https://resend.com" target="_blank" rel="noreferrer" className="text-brand-600 underline">resend.com</a>.
                     </p>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                      From Email Address (Optional)
+                      From Email Address (Sender ID)
                     </label>
                     <input
                       type="text"
@@ -1792,135 +1792,493 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                       className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
                     />
                     <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
-                      Leave blank to use the default sandbox (<code className="text-brand-600">onboarding@resend.dev</code>). If you added a custom domain in Resend, enter your domain's email here.
+                      Leave blank to use the default sandbox (<code className="text-brand-600 font-bold">onboarding@resend.dev</code>). Once you verify your domain in Resend, enter your domain address here.
                     </p>
                   </div>
-                  {/* AUTOMATED INVOICE EMAILS TOGGLE */}
-                  <div className="pt-3 border-t border-slate-200">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-900">
-                          Automated Customer Invoices
-                        </h4>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          Automatically send an order confirmation & itemized invoice email to customers upon checkout.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setSettings({ ...settings, email_invoice_enabled: settings.email_invoice_enabled === false })}
-                        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                          settings.email_invoice_enabled !== false ? 'bg-brand-600' : 'bg-slate-200'
+                </div>
+
+                {/* 2. CUSTOMER EVENT NOTIFICATIONS */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+                    <Send className="h-4 w-4 text-brand-600" />
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                      Automated Customer Event Notifications
+                    </h3>
+                  </div>
+
+                  {/* A. Invoice / Order Placed */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900">
+                        Order Confirmation & Itemized Invoice
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Immediately email an invoice receipt to the customer upon order placement.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSettings({ ...settings, email_invoice_enabled: settings.email_invoice_enabled === false })}
+                      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        settings.email_invoice_enabled !== false ? 'bg-brand-600' : 'bg-slate-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          settings.email_invoice_enabled !== false ? 'translate-x-4' : 'translate-x-0'
                         }`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            settings.email_invoice_enabled !== false ? 'translate-x-4' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
+                      />
+                    </button>
+                  </div>
+
+                  {/* B. Order Dispatched */}
+                  <div className="pt-3 border-t border-slate-200/80 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900">
+                        Order Dispatched & Tracking Alert
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Notify the customer when an order is handed over to Pathao, Steadfast, or local courier with consignment tracking details.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSettings({ ...settings, email_dispatched_enabled: settings.email_dispatched_enabled === false })}
+                      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        settings.email_dispatched_enabled !== false ? 'bg-brand-600' : 'bg-slate-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          settings.email_dispatched_enabled !== false ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* C. Order Cancelled */}
+                  <div className="pt-3 border-t border-slate-200/80 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900">
+                        Order Cancellation Notice
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Send a cancellation email alert to the customer if an order is cancelled from the admin panel.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSettings({ ...settings, email_cancelled_enabled: settings.email_cancelled_enabled === false })}
+                      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        settings.email_cancelled_enabled !== false ? 'bg-brand-600' : 'bg-slate-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          settings.email_cancelled_enabled !== false ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. DAILY PENDING ORDERS DIGEST */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-brand-600" />
+                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                        Store Owner Daily Pending Orders Summary
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSettings({ ...settings, daily_digest_enabled: !settings.daily_digest_enabled })}
+                      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        settings.daily_digest_enabled ? 'bg-brand-600' : 'bg-slate-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          settings.daily_digest_enabled ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <p className="text-[11px] text-slate-500">
+                    Receive a consolidated summary email of all unfulfilled and pending orders directly in your inbox every day.
+                  </p>
+
+                  {settings.daily_digest_enabled && (
+                    <div className="p-4 rounded-xl border border-brand-200/80 bg-brand-50/40 space-y-3 animate-fadeIn">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                            Scheduled Digest Time (Dhaka BST)
+                          </label>
+                          <select
+                            value={settings.daily_digest_time || '20:00'}
+                            onChange={(e) => setSettings({ ...settings, daily_digest_time: e.target.value })}
+                            className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-medium"
+                          >
+                            <option value="08:00">08:00 AM (Morning Kickoff)</option>
+                            <option value="09:00">09:00 AM</option>
+                            <option value="10:00">10:00 AM</option>
+                            <option value="12:00">12:00 PM (Noon)</option>
+                            <option value="15:00">03:00 PM</option>
+                            <option value="18:00">06:00 PM (Evening)</option>
+                            <option value="20:00">08:00 PM (Night Summary - Recommended)</option>
+                            <option value="21:00">09:00 PM</option>
+                            <option value="22:00">10:00 PM</option>
+                            <option value="23:00">11:00 PM</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                            Recipient Owner Email
+                          </label>
+                          <input
+                            type="email"
+                            value={settings.daily_digest_email || ''}
+                            onChange={(e) => setSettings({ ...settings, daily_digest_email: e.target.value })}
+                            placeholder={settings.contact_email ? `Defaults to: ${settings.contact_email}` : 'owner@yourcompany.com'}
+                            className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex items-center justify-between border-t border-brand-200/50">
+                        <span className="text-[11px] text-slate-600 font-medium">
+                          Send a live test summary to verify delivery:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleSendTestDailyDigest}
+                          disabled={testDigestLoading}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition disabled:opacity-50"
+                        >
+                          {testDigestLoading ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              <span>Sending...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send className="h-3.5 w-3.5" />
+                              <span>Send Test Summary</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* TAB: ADS & TRACKING PIXELS */}
+          {activeTab === 'tracking' && (
+            <div className="bg-white rounded-b-lg border border-t-0 border-slate-200 p-6 space-y-8 shadow-sm">
+              <div className="max-w-2xl space-y-6">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">Marketing, Ads Tracking Pixels & Verification</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Connect Meta Pixel & Conversions API (CAPI), Google Analytics 4, Google Tag Manager, TikTok Ads, site verification tags, and custom head scripts.
+                  </p>
+                </div>
+
+                {/* 1. META (FACEBOOK / INSTAGRAM) ADS & CAPI */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+                    <Sparkles className="h-4 w-4 text-blue-600" />
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                      Meta Ads (Facebook & Instagram)
+                    </h3>
+                  </div>
+
+                  {/* Meta Pixel ID */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase flex items-center justify-between">
+                      <span>Meta Pixel ID *</span>
+                      <span className="text-[10px] font-normal text-slate-400">e.g. 123456789012345</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.meta_pixel_id || ''}
+                      onChange={(e) => setSettings({ ...settings, meta_pixel_id: e.target.value })}
+                      placeholder="Paste your 15-16 digit Meta Pixel ID"
+                      className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                    />
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Find this in your <strong>Meta Events Manager</strong>. Automatically tracks PageViews and ecommerce interactions.
+                    </p>
+                  </div>
+
+                  {/* Meta CAPI Token */}
+                  <div className="space-y-1.5 pt-2 border-t border-slate-200/60">
+                    <label className="block text-xs font-bold text-slate-700 uppercase flex items-center justify-between">
+                      <span>Conversions API (CAPI) Access Token (Optional)</span>
+                    </label>
+                    <input
+                      type="password"
+                      value={settings.meta_conversions_api_token || ''}
+                      onChange={(e) => setSettings({ ...settings, meta_conversions_api_token: e.target.value })}
+                      placeholder="EAAG..."
+                      className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                    />
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Generated in Meta Events Manager &gt; Settings &gt; Conversions API &gt; Generate Access Token for server-side tracking resilience against ad blockers.
+                    </p>
+                  </div>
+
+                  {/* Meta Test Event Code & Domain Verification */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-200/60">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        Meta Test Event Code
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.meta_test_event_code || ''}
+                        onChange={(e) => setSettings({ ...settings, meta_test_event_code: e.target.value })}
+                        placeholder="TEST12345"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        For debugging live events in Meta Events Manager &gt; Test Events.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        Meta Domain Verification Code
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.meta_domain_verification || ''}
+                        onChange={(e) => setSettings({ ...settings, meta_domain_verification: e.target.value })}
+                        placeholder="e.g. 1a2b3c4d5e6f7g8h9"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Injects <code className="text-slate-600">&lt;meta name="facebook-domain-verification"&gt;</code> into site &lt;head&gt;.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. GOOGLE ANALYTICS & TAG MANAGER */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+                    <Globe className="h-4 w-4 text-emerald-600" />
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                      Google Marketing & Analytics
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Google Analytics 4 (GA4) */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        GA4 Measurement ID
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.google_analytics_id || ''}
+                        onChange={(e) => setSettings({ ...settings, google_analytics_id: e.target.value })}
+                        placeholder="G-XXXXXXXXXX"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                      />
+                    </div>
+
+                    {/* Google Tag Manager (GTM) */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        Google Tag Manager (GTM) ID
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.google_tag_manager_id || ''}
+                        onChange={(e) => setSettings({ ...settings, google_tag_manager_id: e.target.value })}
+                        placeholder="GTM-XXXXXXX"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                      />
                     </div>
                   </div>
 
-                  {/* DAILY PENDING ORDERS SUMMARY DIGEST */}
-                  <div className="pt-3 border-t border-slate-200 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="h-3.5 w-3.5 text-brand-600" />
-                          <h4 className="text-xs font-bold text-slate-900">
-                            Daily Pending Orders Summary
-                          </h4>
-                        </div>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          Send a daily executive email digest of all unfulfilled/pending orders directly to the store owner.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setSettings({ ...settings, daily_digest_enabled: !settings.daily_digest_enabled })}
-                        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                          settings.daily_digest_enabled ? 'bg-brand-600' : 'bg-slate-200'
-                        }`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            settings.daily_digest_enabled ? 'translate-x-4' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
+                  {/* Google Site Verification */}
+                  <div className="pt-2 border-t border-slate-200/60">
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Google Search Console Site Verification Tag
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.google_site_verification || ''}
+                      onChange={(e) => setSettings({ ...settings, google_site_verification: e.target.value })}
+                      placeholder="e.g. google-site-verification token or meta code"
+                      className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Enables ownership verification in Google Search Console for SEO performance.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3. TIKTOK ADS */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+                    <Share2 className="h-4 w-4 text-slate-900" />
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                      TikTok Ads & Events API
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        TikTok Pixel ID
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.tiktok_pixel_id || ''}
+                        onChange={(e) => setSettings({ ...settings, tiktok_pixel_id: e.target.value })}
+                        placeholder="CXXXXXXXXXXXXXXX"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                      />
                     </div>
 
-                    {settings.daily_digest_enabled && (
-                      <div className="p-3.5 rounded-xl border border-brand-200/80 bg-brand-50/30 space-y-3 mt-2 animate-fadeIn">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                              Daily Delivery Time (BST / Dhaka)
-                            </label>
-                            <select
-                              value={settings.daily_digest_time || '20:00'}
-                              onChange={(e) => setSettings({ ...settings, daily_digest_time: e.target.value })}
-                              className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
-                            >
-                              <option value="08:00">08:00 AM (Morning Kickoff)</option>
-                              <option value="09:00">09:00 AM</option>
-                              <option value="10:00">10:00 AM</option>
-                              <option value="12:00">12:00 PM (Noon)</option>
-                              <option value="15:00">03:00 PM</option>
-                              <option value="18:00">06:00 PM (Evening)</option>
-                              <option value="20:00">08:00 PM (Night Summary - Default)</option>
-                              <option value="21:00">09:00 PM</option>
-                              <option value="22:00">10:00 PM</option>
-                              <option value="23:00">11:00 PM</option>
-                            </select>
-                            <p className="text-[10px] text-slate-400 mt-1">
-                              Scheduled via Vercel Cron in Bangladesh Time (UTC+6).
-                            </p>
-                          </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        TikTok Events API Access Token
+                      </label>
+                      <input
+                        type="password"
+                        value={settings.tiktok_events_api_token || ''}
+                        onChange={(e) => setSettings({ ...settings, tiktok_events_api_token: e.target.value })}
+                        placeholder="••••••••••••••••"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
 
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                              Owner Recipient Email
-                            </label>
-                            <input
-                              type="email"
-                              value={settings.daily_digest_email || ''}
-                              onChange={(e) => setSettings({ ...settings, daily_digest_email: e.target.value })}
-                              placeholder={settings.contact_email ? `Defaults to: ${settings.contact_email}` : 'owner@yourcompany.com'}
-                              className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
-                            />
-                            <p className="text-[10px] text-slate-400 mt-1">
-                              Leave empty to send to store contact email ({settings.contact_email || 'not set'}).
-                            </p>
-                          </div>
-                        </div>
+                {/* 4. CUSTOM HEAD SCRIPTS */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+                    <Code className="h-4 w-4 text-brand-600" />
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                      Custom Header Scripts & Tracking Tags
+                    </h3>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Add any custom JavaScript tracking code or third-party tags (e.g. Microsoft Clarity, Hotjar, Pinterest Tag, Snapchat Pixel) into your storefront.
+                  </p>
+                  <textarea
+                    rows={4}
+                    value={settings.custom_head_scripts || ''}
+                    onChange={(e) => setSettings({ ...settings, custom_head_scripts: e.target.value })}
+                    placeholder={`<!-- Microsoft Clarity or Custom JS -->\n<script>\n  (function(c,l,a,r,i,t,y){ ... })(window, document, "clarity", "script", "YOUR_ID");\n</script>`}
+                    className="w-full rounded-xl border border-slate-200 p-3 text-xs outline-none focus:border-brand-500 bg-white font-mono text-slate-800"
+                  />
+                </div>
 
-                        <div className="pt-2 flex items-center justify-between border-t border-brand-200/50">
-                          <span className="text-[11px] text-slate-600">
-                            Want to test the summary email right now?
-                          </span>
-                          <button
-                            type="button"
-                            onClick={handleSendTestDailyDigest}
-                            disabled={testDigestLoading}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition disabled:opacity-50"
-                          >
-                            {testDigestLoading ? (
-                              <>
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                <span>Sending...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Send className="h-3.5 w-3.5" />
-                                <span>Send Test Summary Now</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                {/* 5. SOCIAL MEDIA PROFILES */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+                    <Share2 className="h-4 w-4 text-brand-600" />
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                      Store Social Media Profiles
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        Facebook Page URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_facebook || ''}
+                        onChange={(e) => setSettings({ ...settings, social_facebook: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_facebook: formatExternalUrl(e.target.value) })}
+                        placeholder="https://facebook.com/yourpage"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        Instagram Profile URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_instagram || ''}
+                        onChange={(e) => setSettings({ ...settings, social_instagram: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_instagram: formatExternalUrl(e.target.value) })}
+                        placeholder="https://instagram.com/yourhandle"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        YouTube Channel URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_youtube || ''}
+                        onChange={(e) => setSettings({ ...settings, social_youtube: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_youtube: formatExternalUrl(e.target.value) })}
+                        placeholder="https://youtube.com/@yourchannel"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        TikTok Profile URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_tiktok || ''}
+                        onChange={(e) => setSettings({ ...settings, social_tiktok: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_tiktok: formatExternalUrl(e.target.value) })}
+                        placeholder="https://tiktok.com/@yourhandle"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        X (Twitter) Profile URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_twitter || ''}
+                        onChange={(e) => setSettings({ ...settings, social_twitter: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_twitter: formatExternalUrl(e.target.value) })}
+                        placeholder="https://x.com/yourhandle"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        LinkedIn Page URL
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.social_linkedin || ''}
+                        onChange={(e) => setSettings({ ...settings, social_linkedin: e.target.value })}
+                        onBlur={(e) => setSettings({ ...settings, social_linkedin: formatExternalUrl(e.target.value) })}
+                        placeholder="https://linkedin.com/company/yourcompany"
+                        className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white"
+                      />
+                    </div>
                   </div>
                 </div>
 

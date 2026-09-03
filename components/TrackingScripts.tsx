@@ -9,11 +9,44 @@ interface TrackingScriptsProps {
 }
 
 export default function TrackingScripts({ settings }: TrackingScriptsProps) {
-  const { meta_pixel_id, google_analytics_id, tiktok_pixel_id } = settings
+  const { 
+    meta_pixel_id, 
+    google_analytics_id, 
+    google_tag_manager_id, 
+    tiktok_pixel_id, 
+    custom_head_scripts 
+  } = settings
 
   return (
     <>
-      {/* 1. META (FACEBOOK / INSTAGRAM) PIXEL */}
+      {/* 1. GOOGLE TAG MANAGER (GTM) */}
+      {google_tag_manager_id && google_tag_manager_id.trim() && (
+        <>
+          <Script
+            id="gtm-script"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+                (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+                new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+                j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+                'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+                })(window,document,'script','dataLayer','${google_tag_manager_id.trim()}');
+              `
+            }}
+          />
+          <noscript>
+            <iframe
+              src={`https://www.googletagmanager.com/ns.html?id=${google_tag_manager_id.trim()}`}
+              height="0"
+              width="0"
+              style={{ display: 'none', visibility: 'hidden' }}
+            />
+          </noscript>
+        </>
+      )}
+
+      {/* 2. META (FACEBOOK / INSTAGRAM) PIXEL */}
       {meta_pixel_id && meta_pixel_id.trim() && (
         <>
           <Script
@@ -47,8 +80,8 @@ export default function TrackingScripts({ settings }: TrackingScriptsProps) {
         </>
       )}
 
-      {/* 2. GOOGLE ANALYTICS 4 (GA4 / GTAG) */}
-      {google_analytics_id && google_analytics_id.trim() && (
+      {/* 3. GOOGLE ANALYTICS 4 (GA4 / GTAG) */}
+      {google_analytics_id && google_analytics_id.trim() && !google_tag_manager_id && (
         <>
           <Script
             strategy="afterInteractive"
@@ -71,7 +104,7 @@ export default function TrackingScripts({ settings }: TrackingScriptsProps) {
         </>
       )}
 
-      {/* 3. TIKTOK PIXEL */}
+      {/* 4. TIKTOK PIXEL */}
       {tiktok_pixel_id && tiktok_pixel_id.trim() && (
         <Script
           id="tiktok-pixel"
@@ -84,6 +117,17 @@ export default function TrackingScripts({ settings }: TrackingScriptsProps) {
                 ttq.page();
               }(window, document, 'ttq');
             `
+          }}
+        />
+      )}
+
+      {/* 5. CUSTOM HEAD SCRIPTS (Microsoft Clarity, Pinterest, Hotjar, etc.) */}
+      {custom_head_scripts && custom_head_scripts.trim() && (
+        <Script
+          id="custom-head-scripts"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: custom_head_scripts.replace(/<\/?script[^>]*>/gi, '')
           }}
         />
       )}

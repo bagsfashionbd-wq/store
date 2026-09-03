@@ -183,6 +183,238 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload) {
   }
 }
 
+interface OrderDispatchedPayload {
+  toEmail: string
+  customerName: string
+  orderId: string
+  courierName: string
+  consignmentId?: string
+  trackingCode?: string
+  shippingAddress: string
+  totalPrice: number
+  codAmount?: number
+  paymentStatus: string
+  items?: Array<{ name: string; quantity: number }>
+}
+
+/**
+ * Send automated order dispatched email to customer via Resend
+ */
+export async function sendOrderDispatchedEmail(payload: OrderDispatchedPayload) {
+  try {
+    const settings = await getStoreSettings()
+
+    if (settings.email_dispatched_enabled === false) {
+      console.log('[Resend] Order dispatched emails are disabled in store settings. Skipping.')
+      return { success: false, reason: 'Dispatched emails disabled in settings' }
+    }
+
+    const apiKey = await getResendApiKey()
+    if (!apiKey || !payload.toEmail || !payload.toEmail.includes('@')) {
+      return { success: false, reason: 'No valid Resend API key or customer email' }
+    }
+
+    const storeName = settings.store_name || 'Online Store'
+    const fromEmail = (settings.resend_from_email || process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev').trim()
+    const sender = fromEmail.includes('<') ? fromEmail : `${storeName} <${fromEmail}>`
+    const shortId = payload.orderId.slice(0, 8).toUpperCase()
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const trackingId = payload.consignmentId || payload.trackingCode
+
+    const isCOD = payload.codAmount && payload.codAmount > 0
+
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Order Dispatched #${shortId}</title>
+      </head>
+      <body style="margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #334155;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+          
+          <!-- Header -->
+          <div style="background-color: #0284c7; padding: 24px; text-align: center; color: #ffffff;">
+            <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">${storeName}</h1>
+            <p style="margin: 4px 0 0 0; font-size: 13px; color: #e0f2fe;">🚚 Your Order Has Been Dispatched!</p>
+          </div>
+
+          <!-- Body -->
+          <div style="padding: 24px;">
+            <div style="background-color: #f0f9ff; border-left: 4px solid #0284c7; padding: 14px; border-radius: 8px; margin-bottom: 20px;">
+              <h2 style="margin: 0; font-size: 16px; color: #0369a1; font-weight: 700;">Great news, ${payload.customerName}!</h2>
+              <p style="margin: 6px 0 0 0; font-size: 13px; color: #075985; line-height: 1.5;">
+                Your order <strong>#${shortId}</strong> has been handed over to <strong>${payload.courierName}</strong> and is on its way to your doorstep.
+              </p>
+            </div>
+
+            <!-- Courier Details Box -->
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+              <table style="width: 100%; font-size: 13px; color: #334155;">
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;">Courier Partner:</td>
+                  <td style="padding: 4px 0; text-align: right; font-weight: bold; color: #0284c7;">${payload.courierName}</td>
+                </tr>
+                ${trackingId ? `
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;">Consignment / Tracking ID:</td>
+                  <td style="padding: 4px 0; text-align: right; font-family: monospace; font-weight: bold;">${trackingId}</td>
+                </tr>
+                ` : ''}
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;">Delivery Address:</td>
+                  <td style="padding: 4px 0; text-align: right;">${payload.shippingAddress}</td>
+                </tr>
+                <tr style="border-top: 1px dashed #cbd5e1;">
+                  <td style="padding: 8px 0 4px 0; color: #0f172a; font-weight: bold;">Amount to Pay on Delivery:</td>
+                  <td style="padding: 8px 0 4px 0; text-align: right; font-weight: 800; font-size: 15px; color: ${isCOD ? '#dc2626' : '#059669'};">
+                    ${isCOD ? `৳${payload.codAmount?.toLocaleString()} (Cash on Delivery)` : '৳0 (Fully Prepaid)'}
+                  </td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Action Button -->
+            <div style="text-align: center; margin: 24px 0;">
+              <a href="${appUrl}/track?id=${payload.orderId}" style="display: inline-block; background-color: #0284c7; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-size: 13px; font-weight: 700; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.2);">
+                Track Your Parcel →
+              </a>
+            </div>
+
+            <!-- Support Footer -->
+            <div style="text-align: center; border-top: 1px solid #e2e8f0; padding-top: 18px; font-size: 12px; color: #94a3b8;">
+              <p style="margin: 0 0 4px 0;">Questions? Reach us anytime at <strong>${settings.contact_phone || settings.contact_email}</strong></p>
+              <p style="margin: 0;">${storeName} • Bangladesh</p>
+            </div>
+
+          </div>
+        </div>
+      </body>
+    </html>
+    `
+
+    const response = await axios.post('https://api.resend.com/emails', {
+      from: sender,
+      to: [payload.toEmail],
+      subject: `Order #${shortId} Dispatched via ${payload.courierName} - ${storeName}`,
+      html: htmlContent
+    }, {
+      headers: {
+        Authorization: `Bearer ${apiKey.trim()}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    console.log(`[Resend] Order dispatched email sent to ${payload.toEmail}. ID:`, response.data?.id)
+    return { success: true, data: response.data }
+  } catch (error: any) {
+    console.error('[Resend] sendOrderDispatchedEmail error:', error.response?.data || error.message)
+    return { success: false, error: error.message }
+  }
+}
+
+interface OrderCancelledPayload {
+  toEmail: string
+  customerName: string
+  orderId: string
+  totalPrice: number
+  reason?: string
+}
+
+/**
+ * Send automated order cancelled email to customer via Resend
+ */
+export async function sendOrderCancelledEmail(payload: OrderCancelledPayload) {
+  try {
+    const settings = await getStoreSettings()
+
+    if (settings.email_cancelled_enabled === false) {
+      console.log('[Resend] Order cancelled emails are disabled in store settings. Skipping.')
+      return { success: false, reason: 'Cancelled emails disabled in settings' }
+    }
+
+    const apiKey = await getResendApiKey()
+    if (!apiKey || !payload.toEmail || !payload.toEmail.includes('@')) {
+      return { success: false, reason: 'No valid Resend API key or customer email' }
+    }
+
+    const storeName = settings.store_name || 'Online Store'
+    const fromEmail = (settings.resend_from_email || process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev').trim()
+    const sender = fromEmail.includes('<') ? fromEmail : `${storeName} <${fromEmail}>`
+    const shortId = payload.orderId.slice(0, 8).toUpperCase()
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Order Cancelled #${shortId}</title>
+      </head>
+      <body style="margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #334155;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+          
+          <!-- Header -->
+          <div style="background-color: #475569; padding: 24px; text-align: center; color: #ffffff;">
+            <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">${storeName}</h1>
+            <p style="margin: 4px 0 0 0; font-size: 13px; color: #cbd5e1;">Order Cancellation Notice</p>
+          </div>
+
+          <!-- Body -->
+          <div style="padding: 24px;">
+            <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 14px; border-radius: 8px; margin-bottom: 20px;">
+              <h2 style="margin: 0; font-size: 16px; color: #991b1b; font-weight: 700;">Order #${shortId} has been cancelled</h2>
+              <p style="margin: 6px 0 0 0; font-size: 13px; color: #b91c1c; line-height: 1.5;">
+                Hello ${payload.customerName}, your order <strong>#${shortId}</strong> (total: ৳${Number(payload.totalPrice).toLocaleString()}) has been cancelled.
+                ${payload.reason ? `<br/><strong>Reason:</strong> ${payload.reason}` : ''}
+              </p>
+            </div>
+
+            <p style="font-size: 13px; color: #475569; line-height: 1.6; margin-bottom: 20px;">
+              If you made an advance payment or have questions regarding this cancellation, please contact our support team immediately with your Order ID #${shortId}.
+            </p>
+
+            <!-- Action Button -->
+            <div style="text-align: center; margin: 24px 0;">
+              <a href="${appUrl}" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-size: 13px; font-weight: 700; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+                Visit Storefront →
+              </a>
+            </div>
+
+            <!-- Support Footer -->
+            <div style="text-align: center; border-top: 1px solid #e2e8f0; padding-top: 18px; font-size: 12px; color: #94a3b8;">
+              <p style="margin: 0 0 4px 0;">Need assistance? Contact <strong>${settings.contact_phone || settings.contact_email}</strong></p>
+              <p style="margin: 0;">${storeName} • Bangladesh</p>
+            </div>
+
+          </div>
+        </div>
+      </body>
+    </html>
+    `
+
+    const response = await axios.post('https://api.resend.com/emails', {
+      from: sender,
+      to: [payload.toEmail],
+      subject: `Order #${shortId} Cancelled - ${storeName}`,
+      html: htmlContent
+    }, {
+      headers: {
+        Authorization: `Bearer ${apiKey.trim()}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    console.log(`[Resend] Order cancelled email sent to ${payload.toEmail}. ID:`, response.data?.id)
+    return { success: true, data: response.data }
+  } catch (error: any) {
+    console.error('[Resend] sendOrderCancelledEmail error:', error.response?.data || error.message)
+    return { success: false, error: error.message }
+  }
+}
+
 /**
  * Send promotional broadcast email to multiple customers
  */
@@ -324,8 +556,8 @@ export async function sendDailyPendingOrdersSummary(targetEmail?: string) {
     const orders = pendingOrders || []
     const totalPendingCount = orders.length
     const totalPendingAmount = orders.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
-    const verificationNeededCount = orders.filter(o => 
-      o.payment_status === 'Pending Verification' || 
+    const verificationNeededCount = orders.filter(o =>
+      o.payment_status === 'Pending Verification' ||
       (o.payment_details?.advance_paid && !o.payment_details?.verified)
     ).length
 
@@ -364,11 +596,10 @@ export async function sendDailyPendingOrdersSummary(targetEmail?: string) {
             ${itemsText}
           </td>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; text-align: center;">
-            <span style="display: inline-block; padding: 3px 8px; border-radius: 9999px; font-size: 10px; font-weight: bold; ${
-              isVerification 
-                ? 'background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a;' 
-                : 'background-color: #f1f5f9; color: #475569;'
-            }">
+            <span style="display: inline-block; padding: 3px 8px; border-radius: 9999px; font-size: 10px; font-weight: bold; ${isVerification
+          ? 'background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a;'
+          : 'background-color: #f1f5f9; color: #475569;'
+        }">
               ${o.payment_method || 'COD'}<br/>
               <span style="font-size: 9px; font-weight: normal;">${o.payment_status}</span>
             </span>
@@ -523,13 +754,13 @@ export async function sendDailyPendingOrdersSummary(targetEmail?: string) {
     })
 
     console.log(`[Resend] Daily pending orders summary sent to ${recipient}. ID:`, response.data?.id)
-    return { 
-      success: true, 
-      recipient, 
-      totalPendingCount, 
-      totalPendingAmount, 
+    return {
+      success: true,
+      recipient,
+      totalPendingCount,
+      totalPendingAmount,
       unreadMessagesCount,
-      data: response.data 
+      data: response.data
     }
   } catch (error: any) {
     const errorDetails = error.response?.data || error.message

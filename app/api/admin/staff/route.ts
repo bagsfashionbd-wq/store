@@ -36,7 +36,8 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await verifyStaffAuth(['shop_owner', 'admin'])
     if (!auth.authorized) {
-      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+      const errMsg = typeof auth.error === 'string' ? auth.error : 'Unauthorized access. Staff account not found.'
+      return NextResponse.json({ success: false, error: errMsg }, { status: auth.status || 403 })
     }
 
     const body = await request.json()
@@ -49,9 +50,45 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (password.length < 6) {
+      return NextResponse.json(
+        { success: false, error: 'Password must be at least 6 characters long.' },
+        { status: 400 }
+      )
+    }
+
     const cleanEmail = email.toLowerCase().trim()
     const cleanRole = role === 'admin' || role === 'shop_owner' ? role : 'staff'
     const supabase = createAdminClient()
+
+    // Pre-check: Does staff member already exist in staff_members table?
+    const { data: existingStaff } = await supabase
+      .from('staff_members')
+      .select('id, full_name, email')
+      .eq('email', cleanEmail)
+      .maybeSingle()
+
+    if (existingStaff) {
+      return NextResponse.json(
+        { success: false, error: `A staff member with email "${cleanEmail}" already exists.` },
+        { status: 400 }
+      )
+    }
+
+    // Helper to format auth errors nicely
+    const formatAuthError = (err: any): string => {
+      if (!err) return 'Unknown authentication error'
+      if (typeof err === 'string' && err.trim().length > 0) return err
+      if (err.message && typeof err.message === 'string' && err.message.trim().length > 0) return err.message
+      if (err.error_description && typeof err.error_description === 'string') return err.error_description
+      if (err.msg && typeof err.msg === 'string') return err.msg
+      if (err.description && typeof err.description === 'string') return err.description
+      if (err.code === 'not_admin' || err.status === 403) {
+        return 'Supabase Service Role Key is invalid or unauthorized. Please verify SUPABASE_SERVICE_ROLE_KEY in your Vercel / environment settings.'
+      }
+      if (err.code) return `Supabase Auth Error (${err.code})`
+      return 'Failed to register credentials in authentication service.'
+    }
 
     // 1. Create User in Supabase Auth via Admin API
     let authUserId: string | null = null
@@ -66,23 +103,47 @@ export async function POST(request: NextRequest) {
     })
 
     if (authError) {
-      // If user already exists in auth.users, check if they are already in staff_members
-      if (authError.message.toLowerCase().includes('already registered') || authError.message.toLowerCase().includes('already exists')) {
-        const { data: existingStaff } = await supabase
-          .from('staff_members')
-          .select('id')
-          .eq('email', cleanEmail)
-          .single()
+      const authErrMsg = (authError.message || '').toLowerCase()
+      const authErrCode = (authError as any).code || ''
 
-        if (existingStaff) {
-          return NextResponse.json(
-            { success: false, error: 'A staff member with this email already exists.' },
-            { status: 400 }
-          )
+      // If user already exists in auth.users (e.g. from customer signups or previous creation)
+      if (
+        authErrMsg.includes('already registered') ||
+        authErrMsg.includes('already exists') ||
+        authErrCode === 'email_exists' ||
+        authError.status === 422
+      ) {
+        // Fetch auth user ID from Supabase auth users
+        try {
+          const { data: usersData } = await supabase.auth.admin.listUsers({ perPage: 1000 })
+          const matched = usersData?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail)
+          if (matched) {
+            authUserId = matched.id
+            // Update their password and role metadata so they can log in
+            await supabase.auth.admin.updateUserById(matched.id, {
+              password: password,
+              email_confirm: true,
+              user_metadata: {
+                full_name,
+                role: cleanRole
+              }
+            })
+          }
+        } catch (findErr) {
+          console.warn('Could not list users for fallback ID matching:', findErr)
         }
-      } else {
+      } else if (authErrCode === 'not_admin' || authError.status === 403) {
         return NextResponse.json(
-          { success: false, error: `Auth Error: ${authError.message}` },
+          {
+            success: false,
+            error: 'Authentication Error: Supabase Service Role Key unauthorized or missing. Please ensure SUPABASE_SERVICE_ROLE_KEY is set with your Supabase service_role secret key in Vercel environment variables.'
+          },
+          { status: 403 }
+        )
+      } else {
+        const errorMsg = formatAuthError(authError)
+        return NextResponse.json(
+          { success: false, error: `Authentication Error: ${errorMsg}` },
           { status: 400 }
         )
       }
@@ -115,7 +176,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: newStaff })
   } catch (err: any) {
     console.error('Staff POST error:', err)
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 })
+    const errText = typeof err?.message === 'string' ? err.message : 'Failed to create staff member.'
+    return NextResponse.json({ success: false, error: errText }, { status: 500 })
   }
 }
 

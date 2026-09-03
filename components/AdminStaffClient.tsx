@@ -7,7 +7,7 @@ import { StaffMember, StaffRole, getRoleDetails, hasFullAccess } from '@/utils/s
 import { 
   Users, UserPlus, ShieldCheck, ShieldAlert, Shield, 
   Search, X, Check, Trash2, Edit2, Phone, Mail, 
-  AlertCircle, RefreshCw, KeyRound, Lock, User
+  AlertCircle, RefreshCw, KeyRound, Lock, User, Eye, EyeOff
 } from 'lucide-react'
 import axios from 'axios'
 
@@ -33,6 +33,7 @@ export default function AdminStaffClient({ initialStaff, currentUserRole = 'shop
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [phone, setPhone] = useState('')
   const [selectedRole, setSelectedRole] = useState<StaffRole>('staff')
 
@@ -92,14 +93,18 @@ export default function AdminStaffClient({ initialStaff, currentUserRole = 'shop
         setFullName('')
         setEmail('')
         setPassword('')
+        setShowPassword(false)
         setPhone('')
         setSelectedRole('staff')
         setTimeout(() => setSuccessMessage(''), 4000)
       } else {
-        throw new Error(res.data.error || 'Failed to add staff member')
+        const errText = typeof res.data.error === 'string' ? res.data.error : res.data.error?.message || 'Failed to add staff member'
+        throw new Error(errText)
       }
     } catch (err: any) {
-      setErrorMessage(err.response?.data?.error || err.message || 'Failed to create staff member.')
+      const respErr = err.response?.data?.error
+      const msg = typeof respErr === 'string' ? respErr : respErr?.message || err.message || 'Failed to create staff member.'
+      setErrorMessage(msg)
     } finally {
       setLoading(false)
     }
@@ -632,14 +637,24 @@ export default function AdminStaffClient({ initialStaff, currentUserRole = 'shop
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                   Temporary Password *
                 </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Min. 6 characters"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 font-mono"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Min. 6 characters"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 pr-10 text-xs outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
 
               {/* Phone (Optional) */}

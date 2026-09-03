@@ -7,27 +7,34 @@ import { getStoreSettings } from '@/utils/settings'
 let cachedPathaoToken: string | null = null
 let pathaoTokenExpiry: number | null = null
 
-export async function getPathaoToken(): Promise<string> {
+export async function getPathaoToken(customCreds?: {
+  pathao_api_url?: string
+  pathao_client_id?: string
+  pathao_client_secret?: string
+  pathao_username?: string
+  pathao_password?: string
+}): Promise<string> {
   const now = Date.now()
-  if (cachedPathaoToken && pathaoTokenExpiry && now < pathaoTokenExpiry) {
+  if (!customCreds && cachedPathaoToken && pathaoTokenExpiry && now < pathaoTokenExpiry) {
     return cachedPathaoToken
   }
 
   const settings = await getStoreSettings()
-  const pathao_api_url = settings.pathao_api_url || process.env.PATHAO_API_URL || 'https://courier-api-sandbox.pathao.com'
-  const pathao_client_id = settings.pathao_client_id || process.env.PATHAO_CLIENT_ID
-  const pathao_client_secret = settings.pathao_client_secret || process.env.PATHAO_CLIENT_SECRET
-  const pathao_username = settings.pathao_username || process.env.PATHAO_USERNAME
-  const pathao_password = settings.pathao_password || process.env.PATHAO_PASSWORD
+  const pathao_api_url = (customCreds?.pathao_api_url || settings.pathao_api_url || process.env.PATHAO_API_URL || 'https://courier-api-sandbox.pathao.com').replace(/\/$/, '')
+  const pathao_client_id = (customCreds?.pathao_client_id || settings.pathao_client_id || process.env.PATHAO_CLIENT_ID || '').trim()
+  const pathao_client_secret = (customCreds?.pathao_client_secret || settings.pathao_client_secret || process.env.PATHAO_CLIENT_SECRET || '').trim()
+  const pathao_username = (customCreds?.pathao_username || settings.pathao_username || process.env.PATHAO_USERNAME || '').trim()
+  const pathao_password = (customCreds?.pathao_password || settings.pathao_password || process.env.PATHAO_PASSWORD || '').trim()
 
   if (!pathao_client_id || !pathao_client_secret || !pathao_username || !pathao_password) {
-    throw new Error('Pathao credentials are not configured in settings.')
+    throw new Error('Pathao credentials (Client ID, Client Secret, Username, Password) are not configured.')
   }
 
   try {
     const response = await axios.post(`${pathao_api_url}/aladdin/api/v1/issue-token`, {
       client_id: pathao_client_id,
       client_secret: pathao_client_secret,
+      grant_type: 'password',
       username: pathao_username,
       password: pathao_password,
     }, {
@@ -39,21 +46,53 @@ export async function getPathaoToken(): Promise<string> {
 
     if (response.data?.access_token) {
       const token = response.data.access_token as string
-      cachedPathaoToken = token
-      pathaoTokenExpiry = now + 14 * 24 * 60 * 60 * 1000 // 14 days
+      if (!customCreds) {
+        cachedPathaoToken = token
+        pathaoTokenExpiry = now + 14 * 24 * 60 * 60 * 1000 // 14 days
+      }
       return token
     }
-    throw new Error('Failed to retrieve Pathao access token')
+    throw new Error('Failed to retrieve Pathao access token from response.')
   } catch (error: any) {
-    console.error('Pathao Authentication Error:', error.response?.data || error.message)
-    throw new Error('Pathao Authentication Failed')
+    const errData = error.response?.data
+    console.error('Pathao Authentication Error Details:', errData || error.message)
+    const detailedMsg = errData?.message || errData?.error_description || errData?.error || error.message
+    throw new Error(`Pathao Authentication Failed: ${detailedMsg}`)
   }
+}
+
+export async function fetchPathaoStores(customCreds?: any): Promise<Array<{ store_id: number; store_name: string; store_address?: string }>> {
+  const settings = await getStoreSettings()
+  const pathao_api_url = (customCreds?.pathao_api_url || settings.pathao_api_url || process.env.PATHAO_API_URL || 'https://courier-api-sandbox.pathao.com').replace(/\/$/, '')
+  const token = await getPathaoToken(customCreds)
+
+  const response = await axios.get(`${pathao_api_url}/aladdin/api/v1/stores`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+  })
+
+  const rawList = response.data?.data?.data || response.data?.data || response.data || []
+  if (Array.isArray(rawList)) {
+    return rawList.map((s: any) => ({
+      store_id: Number(s.store_id || s.id),
+      store_name: s.store_name || s.name || `Store #${s.store_id || s.id}`,
+      store_address: s.store_address || s.address || ''
+    }))
+  }
+  return []
 }
 
 export async function bookPathaoConsignment(order: any, codAmount: number): Promise<string | null> {
   const settings = await getStoreSettings()
-  const pathao_api_url = settings.pathao_api_url || process.env.PATHAO_API_URL || 'https://courier-api-sandbox.pathao.com'
+  const pathao_api_url = (settings.pathao_api_url || process.env.PATHAO_API_URL || 'https://courier-api-sandbox.pathao.com').replace(/\/$/, '')
   const pathao_store_id = settings.pathao_store_id || process.env.PATHAO_STORE_ID
+
+  if (!pathao_store_id) {
+    throw new Error('Pathao Store ID is not configured. Please select your store in Settings > Shipping.')
+  }
 
   try {
     const token = await getPathaoToken()

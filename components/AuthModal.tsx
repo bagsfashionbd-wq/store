@@ -5,7 +5,7 @@ import { useCustomer } from '@/context/CustomerContext'
 import { useLanguage } from '@/context/LanguageContext'
 import {
   X, User, Mail, Lock, Phone, ArrowRight,
-  Loader2, AlertCircle, CheckCircle2, ShieldCheck
+  Loader2, AlertCircle, CheckCircle2, ShieldCheck, Eye, EyeOff
 } from 'lucide-react'
 import axios from 'axios'
 
@@ -16,10 +16,12 @@ export default function AuthModal() {
   // Form Fields
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
+  const [showLoginPassword, setShowLoginPassword] = useState(false)
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [signupPassword, setSignupPassword] = useState('')
+  const [showSignupPassword, setShowSignupPassword] = useState(false)
 
   // Forgot password
   const [forgotEmail, setForgotEmail] = useState('')
@@ -171,13 +173,20 @@ export default function AuthModal() {
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
                   <input
-                    type="password"
+                    type={showLoginPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full rounded-xl border border-slate-200 pl-10 pr-3.5 py-2.5 text-xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 font-medium"
+                    className="w-full rounded-xl border border-slate-200 pl-10 pr-10 py-2.5 text-xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 font-medium"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                  >
+                    {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -275,13 +284,21 @@ export default function AuthModal() {
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
                   <input
-                    type="password"
+                    type={showSignupPassword ? 'text' : 'password'}
                     required
                     value={signupPassword}
                     onChange={(e) => setSignupPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full rounded-xl border border-slate-200 pl-10 pr-3.5 py-2 text-xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10"
+                    className="w-full rounded-xl border border-slate-200 pl-10 pr-10 py-2 text-xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowSignupPassword(!showSignupPassword)}
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                    title={showSignupPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showSignupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
 

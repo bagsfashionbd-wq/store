@@ -3,6 +3,7 @@ import { createAdminClient } from '@/utils/supabase/server'
 import { verifyStaffAuth } from '@/utils/auth'
 import { getStoreSettings } from '@/utils/settings'
 import { getPathaoToken, bookSteadfastConsignment } from '@/utils/courier'
+import { sendOrderDispatchedEmail } from '@/utils/email'
 import axios from 'axios'
 
 export const dynamic = 'force-dynamic'
@@ -35,26 +36,6 @@ export async function POST(request: NextRequest) {
     const settings = await getStoreSettings()
     const shippingProvider = requestedProvider || order.shipping_provider || (settings.pathao_enabled ? 'pathao' : settings.steadfast_enabled ? 'steadfast' : 'manual')
 
-    // Manual Dispatch Mode
-    if (shippingProvider === 'manual') {
-      await adminDb
-        .from('orders')
-        .update({
-          shipping_provider: 'manual',
-          pathao_status: 'dispatched'
-        })
-        .eq('id', order.id)
-
-      return NextResponse.json({
-        success: true,
-        provider: 'manual'
-      })
-    }
-
-    if (order.pathao_consignment_id || order.steadfast_consignment_id) {
-      return NextResponse.json({ error: 'Consignment already booked for this order' }, { status: 400 })
-    }
-
     // Compute precise COD amount to collect
     let codAmount = 0
     if (order.payment_status === 'FullyPaid') {
@@ -66,6 +47,40 @@ export async function POST(request: NextRequest) {
     } else {
       // 100% COD or Unpaid
       codAmount = Number(order.total_price)
+    }
+
+    // Manual Dispatch Mode
+    if (shippingProvider === 'manual') {
+      await adminDb
+        .from('orders')
+        .update({
+          shipping_provider: 'manual',
+          pathao_status: 'dispatched',
+          order_status: 'Shipped'
+        })
+        .eq('id', order.id)
+
+      if (order.customer_email) {
+        sendOrderDispatchedEmail({
+          toEmail: order.customer_email,
+          customerName: order.customer_name,
+          orderId: order.id,
+          courierName: 'Local Courier / Store Delivery',
+          shippingAddress: order.shipping_address,
+          totalPrice: Number(order.total_price),
+          codAmount,
+          paymentStatus: order.payment_status
+        }).catch(err => console.error('[Email] Dispatch email error:', err))
+      }
+
+      return NextResponse.json({
+        success: true,
+        provider: 'manual'
+      })
+    }
+
+    if (order.pathao_consignment_id || order.steadfast_consignment_id) {
+      return NextResponse.json({ error: 'Consignment already booked for this order' }, { status: 400 })
     }
 
     // Steadfast Courier Dispatch
@@ -83,6 +98,21 @@ export async function POST(request: NextRequest) {
           })
           .eq('id', order.id)
 
+        if (order.customer_email) {
+          sendOrderDispatchedEmail({
+            toEmail: order.customer_email,
+            customerName: order.customer_name,
+            orderId: order.id,
+            courierName: 'Steadfast Courier',
+            consignmentId: steadfastResult.consignment_id,
+            trackingCode: steadfastResult.tracking_code,
+            shippingAddress: order.shipping_address,
+            totalPrice: Number(order.total_price),
+            codAmount,
+            paymentStatus: order.payment_status
+          }).catch(err => console.error('[Email] Steadfast dispatch email error:', err))
+        }
+
         return NextResponse.json({
           success: true,
           provider: 'steadfast',
@@ -99,8 +129,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Pathao Courier Dispatch
-    const pathao_api_url = settings.pathao_api_url || process.env.PATHAO_API_URL || 'https://courier-api-sandbox.pathao.com'
+    const pathao_api_url = (settings.pathao_api_url || process.env.PATHAO_API_URL || 'https://courier-api-sandbox.pathao.com').replace(/\/$/, '')
     const pathao_store_id = settings.pathao_store_id || process.env.PATHAO_STORE_ID
+    if (!pathao_store_id) {
+      return NextResponse.json({ error: 'Pathao Store ID is missing. Select your store in Settings > Shipping.' }, { status: 400 })
+    }
+
     const token = await getPathaoToken()
 
     const specialInstruction = codAmount > 0 
@@ -143,6 +177,20 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', order.id)
 
+      if (order.customer_email) {
+        sendOrderDispatchedEmail({
+          toEmail: order.customer_email,
+          customerName: order.customer_name,
+          orderId: order.id,
+          courierName: 'Pathao Courier',
+          consignmentId: consignmentId,
+          shippingAddress: order.shipping_address,
+          totalPrice: Number(order.total_price),
+          codAmount,
+          paymentStatus: order.payment_status
+        }).catch(err => console.error('[Email] Pathao dispatch email error:', err))
+      }
+
       return NextResponse.json({ 
         success: true, 
         provider: 'pathao', 
@@ -158,7 +206,7 @@ export async function POST(request: NextRequest) {
     let errorMessage = error.message || 'Dispatch failed'
     if (error.response?.data?.errors) {
       const validationErrors = Object.entries(error.response.data.errors)
-        .map(([field, msgs]: any) => `${field}: ${msgs.join(', ')}`)
+        .map(([field, msgs]: any) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
         .join('; ')
       errorMessage = `Courier validation failed: ${validationErrors}`
     } else if (error.response?.data?.message) {

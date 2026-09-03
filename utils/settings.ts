@@ -29,6 +29,8 @@ export interface StoreSettings {
   resend_api_key: string
   resend_from_email: string
   email_invoice_enabled: boolean
+  email_dispatched_enabled: boolean
+  email_cancelled_enabled: boolean
   daily_digest_enabled: boolean
   daily_digest_time: string
   daily_digest_email: string
@@ -75,8 +77,15 @@ export interface StoreSettings {
   social_linkedin: string
   // Marketing & Tracking Pixels
   meta_pixel_id: string
+  meta_conversions_api_token: string
+  meta_test_event_code: string
+  meta_domain_verification: string
   google_analytics_id: string
+  google_tag_manager_id: string
+  google_site_verification: string
   tiktok_pixel_id: string
+  tiktok_events_api_token: string
+  custom_head_scripts: string
   // Special Collections
   show_featured: boolean
   show_best_seller: boolean
@@ -128,8 +137,12 @@ export interface PublicStoreSettings {
   social_twitter: string
   social_linkedin: string
   meta_pixel_id: string
+  meta_domain_verification: string
   google_analytics_id: string
+  google_tag_manager_id: string
+  google_site_verification: string
   tiktok_pixel_id: string
+  custom_head_scripts: string
   show_featured: boolean
   show_best_seller: boolean
   show_trending: boolean
@@ -159,6 +172,8 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   resend_api_key: process.env.RESEND_API_KEY || '',
   resend_from_email: process.env.RESEND_FROM_EMAIL || '',
   email_invoice_enabled: true,
+  email_dispatched_enabled: true,
+  email_cancelled_enabled: true,
   daily_digest_enabled: false,
   daily_digest_time: '20:00',
   daily_digest_email: '',
@@ -199,8 +214,15 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   social_twitter: '',
   social_linkedin: '',
   meta_pixel_id: '',
+  meta_conversions_api_token: '',
+  meta_test_event_code: '',
+  meta_domain_verification: '',
   google_analytics_id: '',
+  google_tag_manager_id: '',
+  google_site_verification: '',
   tiktok_pixel_id: '',
+  tiktok_events_api_token: '',
+  custom_head_scripts: '',
   show_featured: true,
   show_best_seller: true,
   show_trending: true,
@@ -245,6 +267,8 @@ export async function getStoreSettings(forceFresh = false): Promise<StoreSetting
       resend_api_key: data.resend_api_key || DEFAULT_SETTINGS.resend_api_key,
       resend_from_email: data.resend_from_email || DEFAULT_SETTINGS.resend_from_email,
       email_invoice_enabled: data.email_invoice_enabled !== undefined ? Boolean(data.email_invoice_enabled) : DEFAULT_SETTINGS.email_invoice_enabled,
+      email_dispatched_enabled: data.email_dispatched_enabled !== undefined ? Boolean(data.email_dispatched_enabled) : DEFAULT_SETTINGS.email_dispatched_enabled,
+      email_cancelled_enabled: data.email_cancelled_enabled !== undefined ? Boolean(data.email_cancelled_enabled) : DEFAULT_SETTINGS.email_cancelled_enabled,
       daily_digest_enabled: data.daily_digest_enabled !== undefined ? Boolean(data.daily_digest_enabled) : DEFAULT_SETTINGS.daily_digest_enabled,
       daily_digest_time: data.daily_digest_time || DEFAULT_SETTINGS.daily_digest_time,
       daily_digest_email: data.daily_digest_email || DEFAULT_SETTINGS.daily_digest_email,
@@ -270,8 +294,15 @@ export async function getStoreSettings(forceFresh = false): Promise<StoreSetting
       social_twitter: data.social_twitter ?? '',
       social_linkedin: data.social_linkedin ?? '',
       meta_pixel_id: data.meta_pixel_id ?? '',
+      meta_conversions_api_token: data.meta_conversions_api_token ?? '',
+      meta_test_event_code: data.meta_test_event_code ?? '',
+      meta_domain_verification: data.meta_domain_verification ?? '',
       google_analytics_id: data.google_analytics_id ?? '',
+      google_tag_manager_id: data.google_tag_manager_id ?? '',
+      google_site_verification: data.google_site_verification ?? '',
       tiktok_pixel_id: data.tiktok_pixel_id ?? '',
+      tiktok_events_api_token: data.tiktok_events_api_token ?? '',
+      custom_head_scripts: data.custom_head_scripts ?? '',
       show_featured: data.show_featured !== undefined ? Boolean(data.show_featured) : DEFAULT_SETTINGS.show_featured,
       show_best_seller: data.show_best_seller !== undefined ? Boolean(data.show_best_seller) : DEFAULT_SETTINGS.show_best_seller,
       show_trending: data.show_trending !== undefined ? Boolean(data.show_trending) : DEFAULT_SETTINGS.show_trending,
@@ -331,8 +362,12 @@ export async function getPublicSettings(): Promise<PublicStoreSettings> {
     social_twitter: full.social_twitter,
     social_linkedin: full.social_linkedin,
     meta_pixel_id: full.meta_pixel_id,
+    meta_domain_verification: full.meta_domain_verification,
     google_analytics_id: full.google_analytics_id,
+    google_tag_manager_id: full.google_tag_manager_id,
+    google_site_verification: full.google_site_verification,
     tiktok_pixel_id: full.tiktok_pixel_id,
+    custom_head_scripts: full.custom_head_scripts,
     show_featured: full.show_featured,
     show_best_seller: full.show_best_seller,
     show_trending: full.show_trending,

@@ -127,17 +127,12 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
       visible: canSeeFullDashboard
     },
     {
-      name: t('admin.messages'),
-      href: '/stradmn?tab=messages',
-      icon: MessageSquare,
-      isActive: isMessagesActive,
+      name: isBangla ? 'গ্রাহক ও বার্তা' : 'Customers',
+      href: '/stradmn/customers',
+      icon: Users,
+      isActive: pathname === '/stradmn/customers',
       badge: unreadCount > 0 ? unreadCount : null,
-      visible: true,
-      onClick: () => {
-        if (isDashboard && onTabChange) {
-          onTabChange('messages')
-        }
-      }
+      visible: true
     },
     {
       name: t('admin.products'),
@@ -163,7 +158,7 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
     {
       name: t('admin.staff'),
       href: '/stradmn/staff',
-      icon: Users,
+      icon: ShieldCheck,
       isActive: pathname === '/stradmn/staff',
       visible: canSeeFullDashboard
     },

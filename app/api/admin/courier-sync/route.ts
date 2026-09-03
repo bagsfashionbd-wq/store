@@ -97,11 +97,11 @@ export async function POST(request: NextRequest) {
         .from('orders')
         .select('*')
         .or('steadfast_consignment_id.not.is.null,pathao_consignment_id.not.is.null')
-        .neq('order_status', 'Delivered')
-        .neq('order_status', 'Completed')
-        .neq('order_status', 'Cancelled')
+        .neq('status', 'Delivered')
+        .neq('status', 'Completed')
+        .neq('status', 'Cancelled')
         .order('created_at', { ascending: false })
-        .limit(50)
+        .limit(100)
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 })
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (ordersToSync.length === 0) {
-      return NextResponse.json({ success: true, message: 'No booked orders to sync', results: [] })
+      return NextResponse.json({ success: true, message: 'No active booked orders to sync', results: [] })
     }
 
     const results: SyncResult[] = []
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
           provider: 'none',
           consignment_id: '',
           raw_status: '',
-          new_order_status: order.order_status,
+          new_order_status: order.order_status || order.status,
           status_changed: false,
           error: 'No consignment ID found'
         })
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
         }
 
         const mapping = mapCourierStatusToOrderStatus(rawStatus)
-        const oldStatus = order.order_status || 'Pending'
+        const oldStatus = order.order_status || order.status || 'Pending'
         const oldPaymentStatus = order.payment_status || 'Pending'
         const newStatus = mapping.order_status || oldStatus
         const newPaymentStatus = mapping.payment_status || oldPaymentStatus
@@ -157,9 +157,12 @@ export async function POST(request: NextRequest) {
             await restoreOrderInventory(adminDb, order.id)
           }
 
-          const updatePayload: Record<string, any> = {}
+          const updatePayload: Record<string, any> = {
+            updated_at: new Date().toISOString()
+          }
           if (mapping.order_status) {
             updatePayload.order_status = mapping.order_status
+            updatePayload.status = mapping.order_status
           }
           if (mapping.payment_status) {
             updatePayload.payment_status = mapping.payment_status
