@@ -2004,17 +2004,23 @@ export default function AdminSettingsClient({ initialSettings }: AdminSettingsCl
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-slate-700 uppercase flex items-center justify-between">
                       <span>Meta Pixel ID *</span>
-                      <span className="text-[10px] font-normal text-slate-400">e.g. 123456789012345</span>
+                      <span className="text-[10px] font-normal text-slate-400">e.g. 1396628299199729</span>
                     </label>
                     <input
                       type="text"
                       value={settings.meta_pixel_id || ''}
-                      onChange={(e) => setSettings({ ...settings, meta_pixel_id: e.target.value })}
-                      placeholder="Paste your 15-16 digit Meta Pixel ID"
+                      onChange={(e) => {
+                        const val = e.target.value
+                        const matchInit = val.match(/fbq\(\s*['"]init['"]\s*,\s*['"](\d+)['"]\s*\)/i)
+                        const matchTr = val.match(/[?&]id=(\d+)/i)
+                        const cleanVal = matchInit ? matchInit[1] : matchTr ? matchTr[1] : val.trim()
+                        setSettings({ ...settings, meta_pixel_id: cleanVal })
+                      }}
+                      placeholder="e.g. 1396628299199729 or paste code"
                       className="w-full rounded border border-slate-200 px-3 py-2 text-xs outline-none focus:border-brand-500 bg-white font-mono"
                     />
                     <p className="text-[11px] text-slate-500 leading-relaxed">
-                      Find this in your <strong>Meta Events Manager</strong>. Automatically tracks PageViews and ecommerce interactions.
+                      Enter your 15–16 digit <strong>Meta Pixel ID</strong>. Our system automatically embeds the full official Facebook tracking script &amp; PageView events into your site header.
                     </p>
                   </div>
 

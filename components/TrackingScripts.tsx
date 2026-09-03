@@ -8,6 +8,16 @@ interface TrackingScriptsProps {
   settings: PublicStoreSettings
 }
 
+function extractCleanPixelId(input?: string): string {
+  if (!input) return ''
+  const trimmed = input.trim()
+  const matchInit = trimmed.match(/fbq\(\s*['"]init['"]\s*,\s*['"](\d+)['"]\s*\)/i)
+  if (matchInit && matchInit[1]) return matchInit[1]
+  const matchTr = trimmed.match(/[?&]id=(\d+)/i)
+  if (matchTr && matchTr[1]) return matchTr[1]
+  return trimmed.replace(/[^0-9]/g, '') || trimmed
+}
+
 export default function TrackingScripts({ settings }: TrackingScriptsProps) {
   const { 
     meta_pixel_id, 
@@ -16,6 +26,8 @@ export default function TrackingScripts({ settings }: TrackingScriptsProps) {
     tiktok_pixel_id, 
     custom_head_scripts 
   } = settings
+
+  const cleanMetaPixelId = extractCleanPixelId(meta_pixel_id)
 
   return (
     <>
@@ -47,7 +59,7 @@ export default function TrackingScripts({ settings }: TrackingScriptsProps) {
       )}
 
       {/* 2. META (FACEBOOK / INSTAGRAM) PIXEL */}
-      {meta_pixel_id && meta_pixel_id.trim() && (
+      {cleanMetaPixelId && (
         <>
           <Script
             id="meta-pixel"
@@ -62,7 +74,7 @@ export default function TrackingScripts({ settings }: TrackingScriptsProps) {
                 t.src=v;s=b.getElementsByTagName(e)[0];
                 s.parentNode.insertBefore(t,s)}(window, document,'script',
                 'https://connect.facebook.net/en_US/fbevents.js');
-                fbq('init', '${meta_pixel_id.trim()}');
+                fbq('init', '${cleanMetaPixelId}');
                 fbq('track', 'PageView');
               `
             }}
@@ -73,7 +85,7 @@ export default function TrackingScripts({ settings }: TrackingScriptsProps) {
               height="1"
               width="1"
               style={{ display: 'none' }}
-              src={`https://www.facebook.com/tr?id=${meta_pixel_id.trim()}&ev=PageView&noscript=1`}
+              src={`https://www.facebook.com/tr?id=${cleanMetaPixelId}&ev=PageView&noscript=1`}
               alt=""
             />
           </noscript>
